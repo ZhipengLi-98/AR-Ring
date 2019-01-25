@@ -41,23 +41,29 @@ def draw_frames(frames):
 	timestamp = frames.timestamp
 	acc = frames.acc
 	gyr = frames.gyr
+	mag = frames.mag
 	touch = frames.touch
 
 	plt.figure(file)
 
-	plt.subplot(2, 1, 1)
+	plt.subplot(3, 1, 1)
 	plt.title('acc')
 	draw_points(timestamp, acc, np.array(touch) * 500)
 	print frames.touch
 	draw_peaks(timestamp, acc)
 
-	plt.subplot(2, 1, 2)
+	plt.subplot(3, 1, 2)
 	plt.title('gyr')
 	draw_points(timestamp, gyr, np.array(touch) * 100)
 	# key_gyr = frames.caln_key_frame()
 	# plt.axvline(key_gyr - 100, color = 'green')
 	# plt.axvline(key_gyr + 100, color = 'green')
 	draw_peaks(timestamp, gyr)
+
+	plt.subplot(3, 1, 3)
+	plt.title('mag')
+	draw_points(timestamp, mag, np.array(touch) * 500)
+	draw_peaks(timestamp, mag)
 
 	plt.show()
 
@@ -68,7 +74,7 @@ if __name__ == '__main__':
 	# 	frames.read_data(file)
 	# 	frames.preprocess()
 	# 	draw_frames(frames)
-	file = 'lzp-index-index.log'
+	file = 'extra-hard.log'
 	frames = Frames()
 	frames.read_data(file)
 	frames.preprocess()

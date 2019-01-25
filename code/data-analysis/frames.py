@@ -9,17 +9,20 @@ class Frames:
 	timestamp = []
 	acc = []
 	gyr = []
+	mag = []
 	touch = []
 
 	def __init__(self):
 		self.timestamp = []
 		self.acc = []
 		self.gyr = []
+		self.mag = []
 
 	def len(self):
 		n = len(self.timestamp)
 		assert n == len(self.acc)
 		assert n == len(self.gyr)
+		assert n == len(self.mag)
 		return n
 
 	def parseTime(self, str):
@@ -33,11 +36,12 @@ class Frames:
 		lines = open(file, 'r')
 		for line in lines:
 			tags = line.strip().split()
-			if (len(tags) == 8):
+			if (len(tags) == 11):
 				self.timestamp.append(int(tags[0]))
 				self.gyr.append(Point(tags[1], tags[2], tags[3]))
 				self.acc.append(Point(tags[4], tags[5], tags[6]))
-				self.touch.append(int(tags[7]))
+				self.mag.append(Point(tags[7], tags[8], tags[9]))
+				self.touch.append(int(tags[10]))
 	
 	def fix_timestamp(self):
 		self.timestamp = np.array(self.timestamp) - self.timestamp[0]
@@ -75,10 +79,14 @@ class Frames:
 	def fix_gyr(self):
 		self.gyr = self.kalman_filter(self.gyr)
 
+	def fix_mag(self):
+		self.mag = self.kalman_filter(self.mag)
+
 	def preprocess(self):
 		self.fix_timestamp()
 		self.fix_acc()
 		self.fix_gyr()
+		self.fix_mag()
 
 	def caln_amplitude(self, points):
 		n = len(points)
