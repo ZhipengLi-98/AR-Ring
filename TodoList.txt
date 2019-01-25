@@ -1,22 +1,26 @@
 处理九轴数据，去除重力影响：madgwick算法 python/c++ 把数据带回家处理
-	确定拿到九轴数据，更能需要更改print语句	
+	确定拿到九轴数据，更能需要更改print语句	done
 
 实时采集数据并输出成图：difficult
+	no idea
 
 构建模型，实验方案，采集数据
-	touch力度
+	touch力度 45 index-index
 		轻 中 重	     
- 	touch手指角度 
+ 	touch手指角度 medium index-index
 		垂直 水平 45
-	touch手心朝向
-		正向touch 手指背面touch
+	touch手心朝向 medium 45 index-index
+		正向touch 手指背面touch 手指侧面？
+		目前也没办法做，因为指环连着线而且恰好戴在手指中部，反转之后没办法去touch
 	指环戴在不同位置的检测区别
 		戴在食指前端，中部和指根对于食指touch的区别
-	指环位置不变，用不同手指touch的区别
+		目前可能没有办法做，因为只有一个size的指环可以用，在我的手指上只能在中部(古爷戴就在指尖)
+	指环位置不变，用不同手指touch的区别 medium 45 normal
 		戴在食指上，拇指，中指和无名指touch
 		戴在中指上，拇指，食指和无名指touch
 
 	实验方案
 		每一种情况下至少touch五次，间隔稍长
+		右手实验(左右手的变量暂不控制)
 
 extra：两根手指(食指和拇指)按压的检测，与力量大小的关系
