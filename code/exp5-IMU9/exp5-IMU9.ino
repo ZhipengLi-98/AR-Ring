@@ -23,7 +23,7 @@ CapacitiveSensor cs_4_2 = CapacitiveSensor(4,2);
 int g_offx = -15;                               // Off-Set are Board specific - Use Serial Oscilloscope program above
 int g_offy = -35;                               // do it by trial and error; modify the signal 
 int g_offz = -35;                               // and write down until you can make zero all the axes
-int hx, hy, hz, turetemp;
+float hx, hy, hz, turetemp;
 
 //-------- REGISTER MAP for ADXL345 chip   -----// 
 #define ACC         (0x53)                      // ADXL345 ACC address
@@ -31,6 +31,20 @@ int hx, hy, hz, turetemp;
 #define DATA_FORMAT (0x31)                      // Data format control 
 #define BW_RATE     (0x2C)                      // Data rate and power mode control 
 #define DATAX0      (0x32)                      // First address for axis x
+
+#define Magnetometer_mX0 0x03
+#define Magnetometer_mX1 0x04
+#define Magnetometer_mZ0 0x05
+#define Magnetometer_mZ1 0x06
+#define Magnetometer_mY0 0x07
+#define Magnetometer_mY1 0x08
+int mX0, mX1;
+int mY0, mY1;
+int mZ0, mZ1;
+float mX_out, mY_out, mZ_out;
+float heading, headingDegrees, headingFiltered, declination;
+float Xm, Ym, Zm;
+#define Magnetometer 0x1E //I2C 7bit address of HMC5883
 
 #define A_TO_READ   (6)                         // num of bytes we are going to read each time 
                                                 // two bytes for each axis
@@ -51,6 +65,13 @@ void initAcc() {
   writeTo(ACC, BW_RATE,     0B00101100);        // 1100 -> ODR = 400Hz, 200 bandwidth = ODR/2 
                                                 // (ODR = Output Data Rate); Table 7 & 8 DS
                                                 // same outputting data at each 10 ms (T = 1/ F)                                              
+}
+
+void initMag() {
+  Wire.beginTransmission(Magnetometer);
+  Wire.write(0x02); // Select mode register
+  Wire.write(0x00); // Continuous measurement mode
+  Wire.endTransmission();
 }
 
 //-------- Returns all data Function   ---------//
@@ -82,6 +103,10 @@ void getAccelerometerData(int * result) {
 
 }
 
+void getMagData(int * result) {
+  
+}
+
 //----------------  Set Up   -------------------//
 void setup()
 {
@@ -89,6 +114,7 @@ void setup()
    Wire.begin();
    initGyro();
    initAcc();
+   initMag();
   pinMode(ledPin, OUTPUT);
   cs_4_2.set_CS_AutocaL_Millis(0xFFFFFFFF);
 }
@@ -113,9 +139,11 @@ void loopGyr() {
 }
 
 void loopAcc() {
-  int hx,hy,hz;
   int acc[3];
   getAccelerometerData(acc);
+  // hx = acc[0] / 256.0;
+  // hy = acc[1] / 256.0;
+  // hz = acc[2] / 256.0;
   hx = acc[0];
   hy = acc[1];
   hz = acc[2];
@@ -128,6 +156,114 @@ void loopAcc() {
   //Serial.print(" Az=");
   Serial.print(hz);
   Serial.print(" ");
+}
+
+void loopMag() {
+  // — — X-Axis
+  Wire.beginTransmission(Magnetometer); // transmit to device
+  Wire.write(Magnetometer_mX1);
+  Wire.endTransmission();
+  Wire.requestFrom(Magnetometer, 1);
+  //if (Wire.available() <= 1)
+  //{
+    mX0 = Wire.read();
+  //}
+  Wire.beginTransmission(Magnetometer); // transmit to device
+  Wire.write(Magnetometer_mX0);
+  Wire.endTransmission();
+  Wire.requestFrom(Magnetometer, 1);
+  //if (Wire.available() <= 1)
+  //{
+    mX1 = Wire.read();
+  //}
+  // — — Y-Axis
+  Wire.beginTransmission(Magnetometer); // transmit to device
+  Wire.write(Magnetometer_mY1);
+  Wire.endTransmission();
+  Wire.requestFrom(Magnetometer, 1);
+  //if (Wire.available() <= 1)
+  //{
+    mY0 = Wire.read();
+  //}
+  Wire.beginTransmission(Magnetometer); // transmit to device
+  Wire.write(Magnetometer_mY0);
+  Wire.endTransmission();
+  Wire.requestFrom(Magnetometer, 1);
+  //if (Wire.available() <= 1)
+  //{
+    mY1 = Wire.read();
+  //}
+
+  // — — Z-Axis
+  Wire.beginTransmission(Magnetometer); // transmit to device
+  Wire.write(Magnetometer_mZ1);
+  Wire.endTransmission();
+  Wire.requestFrom(Magnetometer, 1);
+  //if (Wire.available() <= 1)
+  //{
+    mZ0 = Wire.read();
+  //}
+  Wire.beginTransmission(Magnetometer); // transmit to device
+  Wire.write(Magnetometer_mZ0);
+  Wire.endTransmission();
+  Wire.requestFrom(Magnetometer, 1);
+  //if (Wire.available() <= 1)
+  //{
+    mZ1 = Wire.read();
+  //}
+
+  // — — X-Axis
+  mX1 = mX1 << 8;
+  mX_out = mX0 + mX1; // Raw data
+  // From the datasheet: 0.92 mG/digit
+  Xm = mX_out * 0.00092; // Gauss unit
+  //* Earth magnetic field ranges from 0.25 to 0.65 Gauss, so these are
+  //the values that we need to get approximately.
+  // — — Y-Axis
+  mY1 = mY1 << 8;
+  mY_out = mY0 + mY1;
+  Ym = mY_out * 0.00092;
+  // — — Z-Axis
+  mZ1 = mZ1 << 8;
+  mZ_out = mZ0 + mZ1;
+  Zm = mZ_out * 0.00092;
+
+  //Serial.print(" Mx=");
+  Serial.print(mX_out);
+  Serial.print(" ");
+  //Serial.print(" My=");
+  Serial.print(mY_out);
+  Serial.print(" ");
+  //Serial.print(" Mz=");
+  Serial.print(mZ_out);
+  Serial.print(" ");
+  
+  /*
+  // ==============================
+  //Calculating Heading
+  heading = atan2(Ym, Xm);
+
+  // Correcting the heading with the declination angle depending on your
+  // location
+  // You can find your declination angle at:
+  // http://www.ngdc.noaa.gov/geomag-web/
+  // At my location it’s 4.2 degrees => 0.073 rad
+  // My city = -12.44 degrees = > -0.19540706305329 rad
+  //  http://www.magnetic-declination.com/
+  // declination = 0.073;
+  declination = -0.195;
+  heading += declination;
+  // Correcting when signs are reveresed
+  if (heading < 0) heading += 2 * PI;
+  // Correcting due to the addition of the declination angle
+  if (heading > 2 * PI)heading -= 2 * PI;
+  headingDegrees = heading * 180 / PI; // The heading in Degrees unit
+  // Smoothing the output angle / Low pass filter
+  headingFiltered = headingFiltered * 0.85 + headingDegrees * 0.15;
+  //Sending the heading value through the Serial Port to Processing IDE
+  Serial.print(headingFiltered);
+  Serial.print(" ");
+  */
 }
 
 void loopTouch() {
@@ -152,6 +288,7 @@ void loop()
   Serial.print(" ");
   loopGyr();
   loopAcc();
+  loopMag();
   loopTouch();
   Serial.println();
 }
