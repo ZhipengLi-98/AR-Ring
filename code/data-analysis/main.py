@@ -74,7 +74,7 @@ if __name__ == '__main__':
 	# 	frames.read_data(file)
 	# 	frames.preprocess()
 	# 	draw_frames(frames)
-	file = 'extra-hard.log'
+	file = 'middle-pinky.log'
 	frames = Frames()
 	frames.read_data(file)
 	frames.preprocess()
