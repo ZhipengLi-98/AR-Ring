@@ -53,7 +53,7 @@ if __name__ == '__main__':
             #print(data[1] + ' ' + data[2] + ' ' + data[3])
             #print(u"Mag [G]")
             #print(data[7] + ' ' + data[8] + ' ' + data[9])
-            touch.append(data[10])
+            touch.append(int(data[10]) * 10)
             q.MadgwickAHRSupdate(
                 gx = float(data[1])*math.pi/180.0,
                 gy = float(data[2])*math.pi/180.0,
