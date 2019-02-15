@@ -1,5 +1,7 @@
 处理九轴数据，去除重力影响：madgwick算法 python/c++ 把数据带回家处理
-	确定拿到九轴数据，更能需要更改print语句	done
+	确定拿到九轴数据，可能需要更改print语句	done
+
+	应用了madgwick算法，但是不能确定输入数据的单位是什么，也不能确定输出是否正确
 
 实时采集数据并输出成图：difficult
 	no idea
