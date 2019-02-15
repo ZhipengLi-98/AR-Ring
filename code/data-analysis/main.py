@@ -49,7 +49,7 @@ def draw_frames(frames):
 	plt.subplot(3, 1, 1)
 	plt.title('acc')
 	draw_points(timestamp, acc, np.array(touch) * 500)
-	print frames.touch
+	# print frames.touch
 	draw_peaks(timestamp, acc)
 
 	plt.subplot(3, 1, 2)
@@ -74,7 +74,7 @@ if __name__ == '__main__':
 	# 	frames.read_data(file)
 	# 	frames.preprocess()
 	# 	draw_frames(frames)
-	file = 'middle-pinky.log'
+	file = 'test.log'
 	frames = Frames()
 	frames.read_data(file)
 	frames.preprocess()
