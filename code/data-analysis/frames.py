@@ -43,6 +43,13 @@ class Frames:
 				self.mag.append(Point(tags[7], tags[8], tags[9]))
 				self.touch.append(int(tags[10]))
 	
+	def read_serial(self, timestamp, gyr, acc, mag, touch):
+		self.timestamp = timestamp
+		self.gyr = gyr
+		self.acc = acc
+		self.mag = mag
+		self.touch = touch
+	
 	def fix_timestamp(self):
 		self.timestamp = np.array(self.timestamp) - self.timestamp[0]
 		n = len(self.timestamp)
