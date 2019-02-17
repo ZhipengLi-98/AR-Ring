@@ -41,12 +41,12 @@ def gravity_compensate(q, acc):
     return [acc[0] - g[0], acc[1] - g[1], acc[2] - g[2]]
 
 if __name__ == '__main__':
-    file = 'hard.log'
+    file = 'stable2.log'
     lines = open(file, 'r')
     for line in lines:
         data = line.strip().split()
         if (len(data) == 11):
-            timestamp.append(data[0])
+            timestamp.append(int(data[0]))
             #print(u"Acc [g]")
             #print(data[4] + ' ' + data[5] + ' ' + data[6])
             #print(u"Gyr [deg/s]")
@@ -80,5 +80,5 @@ if __name__ == '__main__':
     plt.subplot(1, 1, 1)
     plt.title('real acc')
     draw_points(timestamp, ans, touch)
-    plt.show()
     # draw_peaks(timestamp, ans)    
+    plt.show()
