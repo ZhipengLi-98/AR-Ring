@@ -242,7 +242,6 @@ void loopMag() {
   // ==============================
   //Calculating Heading
   heading = atan2(Ym, Xm);
-
   // Correcting the heading with the declination angle depending on your
   // location
   // You can find your declination angle at:
@@ -298,7 +297,7 @@ void writeTo(int DEVICE, byte address, byte val) {
    Wire.beginTransmission(DEVICE);              //start transmission to ACC 
    Wire.write(address);                         // send register address
    Wire.write(val);                             // send value to write
-   Wire.endTransmission();                      //end transmission
+   Wire.endTransmission();                      //end transmission    
 }
 /*reads num bytes starting from address register on ACC in to buff array*/
  void readFrom(int DEVICE, byte address, int num, byte buff[]) {
