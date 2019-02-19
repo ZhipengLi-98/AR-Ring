@@ -11,15 +11,46 @@ import scipy.signal as signal
 from sklearn.decomposition import PCA
 from scipy.stats import skew, kurtosis
 import time
-
+import threading
+import copy
+import madgwickahrs
 
 ser = serial.Serial('COM3', 500000)
+
+threads = []
+threadLock = threading.Lock()
 
 timestamp = []
 acc = []
 gyr = []
 mag = []
 touch = []
+
+c_timestamp = []
+c_acc = []
+c_gyr = []
+c_mag = []
+c_touch = []
+
+frames = Frames()
+mad = madgwickahrs.MadgwickAHRS()
+
+def draw(timestamp, gyr, acc, mag, touch):
+    while True:
+        if len(timestamp) > 1:
+            if threadLock.acquire(100):
+                c_timestamp = copy.deepcopy(timestamp)
+                c_gyr = copy.deepcopy(gyr)
+                c_acc = copy.deepcopy(acc)
+                c_mag = copy.deepcopy(mag)
+                c_touch = copy.deepcopy(touch)
+                threadLock.release()
+                frames.read_serial(c_timestamp, c_gyr, c_acc, c_mag, c_touch)
+                frames.preprocess()
+
+                draw_frames(frames)
+
+                plt.pause(0.001)
 
 def draw_points(timestamp, points, touch):
 	n = len(timestamp)
@@ -46,12 +77,14 @@ def draw_frames(frames):
     plt.figure('test')
 
     plt.subplot(3, 1, 1)
+    plt.cla()
     plt.title('acc')
     draw_points(timestamp, acc, np.array(touch) * 500)
     # print frames.touch
     draw_peaks(timestamp, acc)
 
     plt.subplot(3, 1, 2)
+    plt.cla()
     plt.title('gyr')
     draw_points(timestamp, gyr, np.array(touch) * 100)
     # key_gyr = frames.caln_key_frame()
@@ -60,6 +93,7 @@ def draw_frames(frames):
     draw_peaks(timestamp, gyr)
 
     plt.subplot(3, 1, 3)
+    plt.cla()
     plt.title('mag')
     draw_points(timestamp, mag, np.array(touch) * 500)
     draw_peaks(timestamp, mag)
@@ -67,15 +101,21 @@ def draw_frames(frames):
     # print('plot done')
     # plt.show()
 
-if __name__ == '__main__':
+def gravity_compensate(q, acc):
+    g = [0.0, 0.0, 0.0]
 
-    frames = Frames()
+    # get expected direction of gravity
+    g[0] = 2 * (q[1] * q[3] - q[0] * q[2])
+    g[1] = 2 * (q[0] * q[1] + q[2] * q[3])
+    g[2] = q[0] * q[0] - q[1] * q[1] - q[2] * q[2] + q[3] * q[3]
 
+    # compensate accelerometer readings with the expected direction of gravity
+    return [acc[0] - g[0], acc[1] - g[1], acc[2] - g[2]]
+
+def serialRead():
     start = time.time()
     clk = time.time()
-    plt.ion()
-
-    while ((clk - start) < 30.0):
+    while True:
         # print (clk - start)
         s = ser.read()
         line = ""
@@ -84,38 +124,50 @@ if __name__ == '__main__':
             s = ser.read()
         
         line = line.strip().split('-')
-        if len(line) == 7 and (clk - start) > 1.0:
+        if (clk - start) > 1.0:
             # print line
-            timestamp.append(int(line[0]))
-            # gyr.append(line[1])
-            # gyr.append(line[2])
-            temp = line[3].strip().split()
-            # gyr.append(temp[0])
-            gyr.append(Point(line[1], line[2], temp[0]))
-            accx = temp[1]
-            accy = temp[2]
-            temp = line[4].strip().split()
-            # acc.append(temp[0])
-            acc.append(Point(accx, accy, temp[0]))
-            magx = temp[1]
-            # mag.append(line[5])
-            temp = line[6].strip().split()
-            # mag.append(temp[0])
-            mag.append(Point(magx, line[5], temp[0]))
-            touch.append(int(temp[1]))
+            temp = []
+            for i in range(len(line)):
+                t = line[i].strip().split()
+                for i in range(len(t)):
+                    temp.append(t[i])
 
-            frames.read_serial(timestamp, gyr, acc, mag, touch)
-            frames.preprocess()
-            draw_frames(frames)
-            plt.pause(0.1)
+            if len(temp) == 11:
+                if threadLock.acquire(100):
+                    if len(timestamp) > 300:
+                        del timestamp[0]
+                        del gyr[0]
+                        del acc[0]
+                        del mag[0]
+                        del touch[0]
+                    # print temp
 
-        # if len(timestamp) > 1:
-            # frames.read_serial(timestamp, gyr, acc, mag, touch)
-            # frames.preprocess()
-            # draw_frames(frames)
+                    mg = [float(temp[1])*math.pi/180.0, float(temp[2])*math.pi/180.0, float(temp[3])*math.pi/180.0]
+                    ma = [float(temp[4])/256.0, float(temp[5])/256.0, float(temp[6])/256.0]
+                    mm = [temp[7], temp[8], temp[9]]
+
+                    mad.update(mg, ma, mm)
+                    #print(q.q0, q.q1, q.q2, q.q3)
+                    qTemp = mad.quaternion
+                    accR = gravity_compensate(qTemp, ma)
+
+                    timestamp.append(int(temp[0]))
+                    gyr.append(Point(temp[1], temp[2], temp[3]))
+                    # acc.append(Point(temp[4], temp[5], temp[6]))
+                    acc.append(Point(accR[0], accR[1], accR[2]))
+                    mag.append(Point(temp[7], temp[8], temp[9]))
+                    touch.append(int(temp[10]))
+                    threadLock.release()
         
         clk = time.time()
 
-    end = time.time()
-    # plt.show()
-    print("Done")
+
+if __name__ == '__main__':
+    plt.ion()
+
+    threadA = threading.Thread(target=serialRead, args=())
+    threads.append(threadA)
+    threadB = threading.Thread(target=draw, args=(timestamp, gyr, acc, mag, touch))
+    threads.append(threadB)
+    threadA.start()
+    threadB.start()

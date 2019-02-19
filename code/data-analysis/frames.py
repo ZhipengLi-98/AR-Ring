@@ -51,13 +51,8 @@ class Frames:
 		self.touch = touch
 	
 	def fix_timestamp(self):
-		self.timestamp = np.array(self.timestamp) - self.timestamp[0]
-		n = len(self.timestamp)
-		j = 0
-		for i in range(1, n):
-			if (self.timestamp[i] != self.timestamp[i - 1]):
-				self.timestamp[j : i] = np.linspace(self.timestamp[j], self.timestamp[i], i - j, endpoint = False)
-				j = i
+		# self.timestamp = np.array(self.timestamp) - self.timestamp[0]
+		self.timestamp = np.array(self.timestamp)
 
 	def kalman_filter(self, points):
 		x, y, z = Point.points_2_xyz(points)
@@ -81,7 +76,7 @@ class Frames:
 		y -= np.median(y)
 		z -= np.median(z)
 		self.acc = Point.xyz_2_points(x, y, z)
-		self.acc = self.kalman_filter(self.acc)
+		#self.acc = self.kalman_filter(self.acc)
 
 	def fix_gyr(self):
 		self.gyr = self.kalman_filter(self.gyr)
@@ -92,8 +87,8 @@ class Frames:
 	def preprocess(self):
 		self.fix_timestamp()
 		self.fix_acc()
-		self.fix_gyr()
-		self.fix_mag()
+		#self.fix_gyr()
+		#self.fix_mag()
 
 	def caln_amplitude(self, points):
 		n = len(points)
