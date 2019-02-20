@@ -42,7 +42,7 @@ def draw(timestamp, gyr, acc, mag, touch):
                 c_timestamp = copy.deepcopy(timestamp)
                 c_gyr = copy.deepcopy(gyr)
                 c_acc = copy.deepcopy(acc)
-                c_mag = copy.deepcopy(mag)
+                # c_mag = copy.deepcopy(mag)
                 c_touch = copy.deepcopy(touch)
                 threadLock.release()
                 frames.read_serial(c_timestamp, c_gyr, c_acc, c_mag, c_touch)
@@ -71,32 +71,32 @@ def draw_frames(frames):
     timestamp = frames.timestamp
     acc = frames.acc
     gyr = frames.gyr
-    mag = frames.mag
+    # mag = frames.mag
     touch = frames.touch
 
     plt.figure('test')
 
-    plt.subplot(3, 1, 1)
+    plt.subplot(2, 1, 1)
     plt.cla()
     plt.title('acc')
-    draw_points(timestamp, acc, np.array(touch) * 500)
+    draw_points(timestamp, acc, np.array(touch) * 10)
     # print frames.touch
-    draw_peaks(timestamp, acc)
+    # draw_peaks(timestamp, acc)
 
-    plt.subplot(3, 1, 2)
+    plt.subplot(2, 1, 2)
     plt.cla()
     plt.title('gyr')
     draw_points(timestamp, gyr, np.array(touch) * 100)
     # key_gyr = frames.caln_key_frame()
     # plt.axvline(key_gyr - 100, color = 'green')
     # plt.axvline(key_gyr + 100, color = 'green')
-    draw_peaks(timestamp, gyr)
+    # draw_peaks(timestamp, gyr)
 
-    plt.subplot(3, 1, 3)
-    plt.cla()
-    plt.title('mag')
-    draw_points(timestamp, mag, np.array(touch) * 500)
-    draw_peaks(timestamp, mag)
+    # plt.subplot(3, 1, 3)
+    # plt.cla()
+    # plt.title('mag')
+    # draw_points(timestamp, mag, np.array(touch) * 500)
+    # draw_peaks(timestamp, mag)
 
     # print('plot done')
     # plt.show()
@@ -123,30 +123,27 @@ def serialRead():
             line += s
             s = ser.read()
         
-        line = line.strip().split('-')
+        # line = line.strip().split('-')
         if (clk - start) > 1.0:
-            # print line
-            temp = []
-            for i in range(len(line)):
-                t = line[i].strip().split()
-                for i in range(len(t)):
-                    temp.append(t[i])
-
-            if len(temp) == 11:
+            print line
+            temp = line.strip().split()
+            # print temp
+            if len(temp) == 8:
                 if threadLock.acquire(100):
                     if len(timestamp) > 300:
                         del timestamp[0]
                         del gyr[0]
                         del acc[0]
-                        del mag[0]
+                        # del mag[0]
                         del touch[0]
                     # print temp
 
                     mg = [float(temp[1])*math.pi/180.0, float(temp[2])*math.pi/180.0, float(temp[3])*math.pi/180.0]
                     ma = [float(temp[4])/256.0, float(temp[5])/256.0, float(temp[6])/256.0]
-                    mm = [temp[7], temp[8], temp[9]]
+                    # mm = [temp[7], temp[8], temp[9]]
 
-                    mad.update(mg, ma, mm)
+                    # mad.update(mg, ma, mm)
+                    mad.update_imu(mg, ma)
                     #print(q.q0, q.q1, q.q2, q.q3)
                     qTemp = mad.quaternion
                     accR = gravity_compensate(qTemp, ma)
@@ -155,8 +152,8 @@ def serialRead():
                     gyr.append(Point(temp[1], temp[2], temp[3]))
                     # acc.append(Point(temp[4], temp[5], temp[6]))
                     acc.append(Point(accR[0], accR[1], accR[2]))
-                    mag.append(Point(temp[7], temp[8], temp[9]))
-                    touch.append(int(temp[10]))
+                    # mag.append(Point(temp[7], temp[8], temp[9]))
+                    touch.append(int(temp[7]))
                     threadLock.release()
         
         clk = time.time()

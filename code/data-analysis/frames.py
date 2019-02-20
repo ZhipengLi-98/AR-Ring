@@ -47,7 +47,7 @@ class Frames:
 		self.timestamp = timestamp
 		self.gyr = gyr
 		self.acc = acc
-		self.mag = mag
+		# self.mag = mag
 		self.touch = touch
 	
 	def fix_timestamp(self):
