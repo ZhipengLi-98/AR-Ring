@@ -3,17 +3,17 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
-    <IncludePath>D:\LeapMotion\Leap_Motion_Developer_Kit_4.0.0+52173\LeapSDK\include;D:\opencv\build\install\include;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\LeapMotion\Leap_Motion_Developer_Kit_4.0.0+52173\LeapSDK\lib\x64;D:\opencv\build\install\x64\vc15\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>D:\LeapMotion\Leap_Motion_Developer_Kit_4.0.0+52173\LeapSDK\include;C:\opencv\build\install\include;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\LeapMotion\Leap_Motion_Developer_Kit_4.0.0+52173\LeapSDK\lib\x64;C:\opencv\build\install\x64\vc15\lib;$(LibraryPath)</LibraryPath>
     <_PropertySheetDisplayName>visual</_PropertySheetDisplayName>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>D:\LeapMotion\Leap_Motion_Developer_Kit_4.0.0+52173\LeapSDK\include;D:\opencv\build\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\LeapMotion\Leap_Motion_Developer_Kit_4.0.0+52173\LeapSDK\include;C:\opencv\build\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>D:\opencv\build\install\x64\vc15\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>LeapC.lib;opencv_world345.lib;opencv_world345d.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>D:\LeapMotion\Leap_Motion_Developer_Kit_4.0.0+52173\LeapSDK\lib\x64;C:\opencv\build\install\x64\vc15\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>opencv_world345.lib;opencv_world345d.lib;LeapC.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup />

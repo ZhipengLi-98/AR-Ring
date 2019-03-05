@@ -1,11 +1,3 @@
-/******************************************************************************\
-* Copyright (C) 2012-2017 Leap Motion, Inc. All rights reserved.               *
-* Leap Motion proprietary and confidential. Not for distribution.              *
-* Use subject to the terms of the Leap Motion SDK Agreement available at       *
-* https://developer.leapmotion.com/sdk_agreement, or another agreement         *
-* between Leap Motion and you, your company or other organization.             *
-\******************************************************************************/
-
 #undef __cplusplus
 
 #include <stdio.h>
@@ -20,6 +12,8 @@
 
 vector<Frame> frames;
 vector<Image> images;
+
+Image imageInst;
 
 int start;
 
@@ -45,8 +39,9 @@ static void OnFrame(const LEAP_TRACKING_EVENT *frame) {
 		Frame next;
 		LEAP_HAND* hand = &frame->pHands[h];
 		next.setData(hand->grab_angle, hand->grab_strength, hand->palm, hand->digits);
+		next.convert();
 		int now = clock();
-		next.timestamp = (double)(now - start);
+		next.timestamp = (double)(now);
 		/*
 		printf("    Hand id %i is a %s hand with position (%f, %f, %f).\n",
 			hand->id,
@@ -63,7 +58,7 @@ static void OnFrame(const LEAP_TRACKING_EVENT *frame) {
 static void OnImage(const LEAP_IMAGE_EVENT *image) {
 	Image img;
 	int now = clock();
-	img.timestamp = (double)(now - start);
+	img.timestamp = (double)now;
 	img.display(image->image[0].properties.width, image->image[0].properties.height, image->image[0].data, image->image[1].data);
 	/*
 	printf("Image %lli  => Left: %d x %d (bpp=%d), Right: %d x %d (bpp=%d)\n",
@@ -71,7 +66,7 @@ static void OnImage(const LEAP_IMAGE_EVENT *image) {
 		image->image[0].properties.width, image->image[0].properties.height, image->image[0].properties.bpp * 8,
 		image->image[1].properties.width, image->image[1].properties.height, image->image[1].properties.bpp * 8);
 		*/
-	images.push_back(img);
+	// images.push_back(img);
 }
 
 static void OnLogMessage(const eLeapLogSeverity severity, const int64_t timestamp,
@@ -143,34 +138,28 @@ void writeFrames(char* fileName) {
 		fout << iter->timestamp << " "
 			<< iter->grab_angle << " "
 			<< iter->grab_strength << " "
-			<< iter->palm.pos.x << " "
-			<< iter->palm.pos.y << " "
-			<< iter->palm.pos.z << " "
-			<< iter->palm.normal.x << " "
-			<< iter->palm.normal.y << " "
-			<< iter->palm.normal.z << " "
-			<< iter->palm.direction.x << " "
-			<< iter->palm.direction.y << " "
-			<< iter->palm.direction.z << " "
-			<< iter->palm.orientation.x << " "
-			<< iter->palm.orientation.y << " "
-			<< iter->palm.orientation.z << " "
-			<< iter->palm.orientation.w << " ";
+			<< iter->palm.realPos.at<double>(0, 0) << " "
+			<< iter->palm.realPos.at<double>(1, 0) << " "
+			<< iter->palm.realPos.at<double>(2, 0) << " "
+			<< iter->palm.realNormal.at<double>(0, 0) << " "
+			<< iter->palm.realNormal.at<double>(1, 0) << " "
+			<< iter->palm.realNormal.at<double>(2, 0) << " "
+			<< iter->palm.realDirection.at<double>(0, 0) << " "
+			<< iter->palm.realDirection.at<double>(1, 0) << " "
+			<< iter->palm.realDirection.at<double>(2, 0) << " ";
 		for (int i = 0; i < 5; i++) {
 			fout << iter->fingers[i].id << " "
 				<< iter->fingers[i].extended << " ";
-			for (int j = 0; j < 4; j++) {
-				fout << iter->fingers[i].bones[j].width << " "
-					<< iter->fingers[i].bones[j].prev.x << " "
-					<< iter->fingers[i].bones[j].prev.y << " "
-					<< iter->fingers[i].bones[j].prev.z << " "
-					<< iter->fingers[i].bones[j].next.x << " "
-					<< iter->fingers[i].bones[j].next.y << " "
-					<< iter->fingers[i].bones[j].next.z << " "
-					<< iter->fingers[i].bones[j].rotation.x << " "
-					<< iter->fingers[i].bones[j].rotation.y << " "
-					<< iter->fingers[i].bones[j].rotation.z << " "
-					<< iter->fingers[i].bones[j].rotation.w << " ";
+			fout << iter->fingers[i].bones[0].realPrev.at<double>(0, 0) << " "
+				<< iter->fingers[i].bones[0].realPrev.at<double>(1, 0) << " "
+				<< iter->fingers[i].bones[0].realPrev.at<double>(2, 0) << " "
+				<< iter->fingers[i].bones[0].realNext.at<double>(0, 0) << " "
+				<< iter->fingers[i].bones[0].realNext.at<double>(1, 0) << " "
+				<< iter->fingers[i].bones[0].realNext.at<double>(2, 0) << " ";
+			for (int j = 1; j < 4; j++) {
+				fout << iter->fingers[i].bones[j].realNext.at<double>(0, 0) << " "
+					<< iter->fingers[i].bones[j].realNext.at<double>(1, 0) << " "
+					<< iter->fingers[i].bones[j].realNext.at<double>(2, 0) << " ";
 			}
 		}
 		fout << endl;
@@ -200,16 +189,16 @@ int main(int argc, char** argv) {
 		LEAP_ALLOCATOR allocator = { allocate, deallocate, NULL };
 		LeapSetAllocator(*connectionHandle, &allocator);
 	}
-	LeapSetPolicyFlags(*connectionHandle, eLeapPolicyFlag_Images | eLeapPolicyFlag_MapPoints, 0);
+	LeapSetPolicyFlags(*connectionHandle, eLeapPolicyFlag_Images | eLeapPolicyFlag_MapPoints | eLeapPolicyFlag_OptimizeHMD, 0);
 
 	printf("Press Enter to exit program.\n");
 	getchar();
 	std::cout << "Please Enter File Name" << std::endl;
-	char name[105];
-	std::cin >> name;
+	char namef[105], namei[105];
+	std::cin >> namef;
 	
-	// writeFrames(name);
-	writeImages(name);
+	writeFrames(namef);
+	// writeImages(namei);
 
 	// DestroyConnection();
 
