@@ -267,8 +267,9 @@ void loopMag() {
 
 void loopTouch() {
   long cap =  cs_4_2.capacitiveSensor(10);
-  
-  if (cap > 200) {
+  // Serial.print(cap);
+  // Serial.print(" ");
+    if (cap > 200) {
     digitalWrite(ledPin, HIGH);
     //Serial.print(" Touch=");
     Serial.print(1);
@@ -287,7 +288,7 @@ void loop()
   Serial.print(" ");
   loopGyr();
   loopAcc();
-  loopMag();
+  // loopMag();
   loopTouch();
   Serial.println();
 }
