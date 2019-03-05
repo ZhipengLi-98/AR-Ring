@@ -45,9 +45,35 @@ the use of this software, even if advised of the possibility of such damage.
 #include <iostream>
 #include <ctime>
 
+#include "LeapC.h"
+#include "ExampleConnection.h"
+
 using namespace std;
 using namespace cv;
 
+int markersX;
+int markersY;
+
+float markerLength;
+float markerSeparation;
+int dictionaryId;
+string outputFile;
+
+int calibrationFlags = 0;
+float aspectRatio = 1;
+
+Ptr<aruco::DetectorParameters> detectorParams = aruco::DetectorParameters::create();
+
+bool refindStrategy;
+int camId;
+String video;
+
+vector< vector< vector< Point2f > > > allCorners;
+vector< vector< int > > allIds;
+Size imgSize;
+Ptr<aruco::Board> board;
+
+static LEAP_CONNECTION* connectionHandle;
 
 namespace {
 const char* about =
@@ -144,7 +170,74 @@ static bool saveCameraParams(const string &filename, Size imageSize, float aspec
     return true;
 }
 
+/** Callback for when the connection opens. */
+static void OnConnect() {
+	printf("Connected.\n");
+}
 
+/** Callback for when a device is found. */
+static void OnDevice(const LEAP_DEVICE_INFO *props) {
+	printf("Found device %s.\n", props->serial);
+}
+
+static void OnImage(const LEAP_IMAGE_EVENT *img) {
+
+	Mat image = Mat(img->image[0].properties.height, img->image[0].properties.width, CV_8UC1, img->image[0].data);
+
+	Ptr<aruco::Dictionary> dictionary =
+		aruco::getPredefinedDictionary(aruco::PREDEFINED_DICTIONARY_NAME(dictionaryId));
+
+	// create board object
+	Ptr<aruco::GridBoard> gridboard =
+		aruco::GridBoard::create(markersX, markersY, markerLength, markerSeparation, dictionary);
+	board = gridboard.staticCast<aruco::Board>();
+
+	// collected frames for calibration
+
+	// while (true) {
+		// std::cout << "calibrating" << std::endl;
+
+
+		Mat imageCopy;
+
+		vector< int > ids;
+		vector< vector< Point2f > > corners, rejected;
+
+		// detect markers
+		aruco::detectMarkers(image, dictionary, corners, ids, detectorParams, rejected);
+
+		// refind strategy to detect more markers
+		if (refindStrategy) aruco::refineDetectedMarkers(image, board, corners, ids, rejected);
+
+		// draw results
+		image.copyTo(imageCopy);
+		if (ids.size() > 0) aruco::drawDetectedMarkers(imageCopy, corners, ids);
+		putText(imageCopy, "Press 'c' to add current frame. 'ESC' to finish and calibrate",
+			Point(10, 20), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(255, 0, 0), 2);
+
+		imshow("out", imageCopy);
+		char key = (char)waitKey(1);
+		if (key == 'c' && ids.size() > 0) {
+			cout << "Frame captured" << endl;
+			allCorners.push_back(corners);
+			allIds.push_back(ids);
+			imgSize = image.size();
+		}
+		// }
+	
+	
+}
+
+static void* allocate(uint32_t size, eLeapAllocatorType typeHint, void* state) {
+	void* ptr = malloc(size);
+	return ptr;
+}
+
+static void deallocate(void* ptr, void* state) {
+	if (!ptr)
+		return;
+	free(ptr);
+}
 
 /**
  */
@@ -157,15 +250,15 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    int markersX = parser.get<int>("w");
-    int markersY = parser.get<int>("h");
-    float markerLength = parser.get<float>("l");
-    float markerSeparation = parser.get<float>("s");
-    int dictionaryId = parser.get<int>("d");
-    string outputFile = parser.get<String>(0);
+    markersX = parser.get<int>("w");
+    markersY = parser.get<int>("h");
+    markerLength = parser.get<float>("l");
+    markerSeparation = parser.get<float>("s");
+    dictionaryId = parser.get<int>("d");
+    outputFile = parser.get<String>(0);
 
-    int calibrationFlags = 0;
-    float aspectRatio = 1;
+    calibrationFlags = 0;
+    aspectRatio = 1;
     if(parser.has("a")) {
         calibrationFlags |= CALIB_FIX_ASPECT_RATIO;
         aspectRatio = parser.get<float>("a");
@@ -173,7 +266,7 @@ int main(int argc, char *argv[]) {
     if(parser.get<bool>("zt")) calibrationFlags |= CALIB_ZERO_TANGENT_DIST;
     if(parser.get<bool>("pc")) calibrationFlags |= CALIB_FIX_PRINCIPAL_POINT;
 
-    Ptr<aruco::DetectorParameters> detectorParams = aruco::DetectorParameters::create();
+    detectorParams = aruco::DetectorParameters::create();
     if(parser.has("dp")) {
         bool readOk = readDetectorParameters(parser.get<string>("dp"), detectorParams);
         if(!readOk) {
@@ -182,8 +275,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    bool refindStrategy = parser.get<bool>("rs");
-    int camId = parser.get<int>("ci");
+    refindStrategy = parser.get<bool>("rs");
+    camId = parser.get<int>("ci");
     String video;
 
     if(parser.has("v")) {
@@ -195,6 +288,7 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
+	/*
     VideoCapture inputVideo;
     int waitTime;
     if(!video.empty()) {
@@ -204,91 +298,65 @@ int main(int argc, char *argv[]) {
         inputVideo.open(camId);
         waitTime = 10;
     }
+	*/
 
-    Ptr<aruco::Dictionary> dictionary =
-        aruco::getPredefinedDictionary(aruco::PREDEFINED_DICTIONARY_NAME(dictionaryId));
+	ConnectionCallbacks.on_connection = &OnConnect;
+	ConnectionCallbacks.on_device_found = &OnDevice;
+	ConnectionCallbacks.on_image = &OnImage;
+	
+	connectionHandle = OpenConnection();
+	{
+		LEAP_ALLOCATOR allocator = { allocate, deallocate, NULL };
+		LeapSetAllocator(*connectionHandle, &allocator);
+	}
+	LeapSetPolicyFlags(*connectionHandle, eLeapPolicyFlag_Images | eLeapPolicyFlag_MapPoints, 0);
 
-    // create board object
-    Ptr<aruco::GridBoard> gridboard =
-            aruco::GridBoard::create(markersX, markersY, markerLength, markerSeparation, dictionary);
-    Ptr<aruco::Board> board = gridboard.staticCast<aruco::Board>();
+	getchar();
 
-    // collected frames for calibration
-    vector< vector< vector< Point2f > > > allCorners;
-    vector< vector< int > > allIds;
-    Size imgSize;
+	std::cout << allIds.size() << std::endl;
+	std::cout << allCorners.size() << std::endl;
 
-    while(inputVideo.grab()) {
-        Mat image, imageCopy;
-        inputVideo.retrieve(image);
+	if (allIds.size() < 1) {
+		cerr << "Not enough captures for calibration" << endl;
+	}
 
-        vector< int > ids;
-        vector< vector< Point2f > > corners, rejected;
+	Mat cameraMatrix, distCoeffs;
+	vector< Mat > rvecs, tvecs;
+	double repError;
 
-        // detect markers
-        aruco::detectMarkers(image, dictionary, corners, ids, detectorParams, rejected);
+	if (calibrationFlags & CALIB_FIX_ASPECT_RATIO) {
+		cameraMatrix = Mat::eye(3, 3, CV_64F);
+		cameraMatrix.at< double >(0, 0) = aspectRatio;
+	}
 
-        // refind strategy to detect more markers
-        if(refindStrategy) aruco::refineDetectedMarkers(image, board, corners, ids, rejected);
+	// prepare data for calibration
+	vector< vector< Point2f > > allCornersConcatenated;
+	vector< int > allIdsConcatenated;
+	vector< int > markerCounterPerFrame;
+	markerCounterPerFrame.reserve(allCorners.size());
+	for (unsigned int i = 0; i < allCorners.size(); i++) {
+		markerCounterPerFrame.push_back((int)allCorners[i].size());
+		for (unsigned int j = 0; j < allCorners[i].size(); j++) {
+			allCornersConcatenated.push_back(allCorners[i][j]);
+			allIdsConcatenated.push_back(allIds[i][j]);
+		}
+	}
+	// calibrate camera
+	repError = aruco::calibrateCameraAruco(allCornersConcatenated, allIdsConcatenated,
+		markerCounterPerFrame, board, imgSize, cameraMatrix,
+		distCoeffs, rvecs, tvecs, calibrationFlags);
 
-        // draw results
-        image.copyTo(imageCopy);
-        if(ids.size() > 0) aruco::drawDetectedMarkers(imageCopy, corners, ids);
-        putText(imageCopy, "Press 'c' to add current frame. 'ESC' to finish and calibrate",
-                Point(10, 20), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(255, 0, 0), 2);
+	std::cout << "calibrate" << std::endl;
+	bool saveOk = saveCameraParams(outputFile, imgSize, aspectRatio, calibrationFlags, cameraMatrix,
+		distCoeffs, repError);
 
-        imshow("out", imageCopy);
-        char key = (char)waitKey(waitTime);
-        if(key == 27) break;
-        if(key == 'c' && ids.size() > 0) {
-            cout << "Frame captured" << endl;
-            allCorners.push_back(corners);
-            allIds.push_back(ids);
-            imgSize = image.size();
-        }
-    }
+	if (!saveOk) {
+		cerr << "Cannot save output file" << endl;
+	}
 
-    if(allIds.size() < 1) {
-        cerr << "Not enough captures for calibration" << endl;
-        return 0;
-    }
+	cout << "Rep Error: " << repError << endl;
+	cout << "Calibration saved to " << outputFile << endl;
 
-    Mat cameraMatrix, distCoeffs;
-    vector< Mat > rvecs, tvecs;
-    double repError;
-
-    if(calibrationFlags & CALIB_FIX_ASPECT_RATIO) {
-        cameraMatrix = Mat::eye(3, 3, CV_64F);
-        cameraMatrix.at< double >(0, 0) = aspectRatio;
-    }
-
-    // prepare data for calibration
-    vector< vector< Point2f > > allCornersConcatenated;
-    vector< int > allIdsConcatenated;
-    vector< int > markerCounterPerFrame;
-    markerCounterPerFrame.reserve(allCorners.size());
-    for(unsigned int i = 0; i < allCorners.size(); i++) {
-        markerCounterPerFrame.push_back((int)allCorners[i].size());
-        for(unsigned int j = 0; j < allCorners[i].size(); j++) {
-            allCornersConcatenated.push_back(allCorners[i][j]);
-            allIdsConcatenated.push_back(allIds[i][j]);
-        }
-    }
-    // calibrate camera
-    repError = aruco::calibrateCameraAruco(allCornersConcatenated, allIdsConcatenated,
-                                           markerCounterPerFrame, board, imgSize, cameraMatrix,
-                                           distCoeffs, rvecs, tvecs, calibrationFlags);
-
-    bool saveOk = saveCameraParams(outputFile, imgSize, aspectRatio, calibrationFlags, cameraMatrix,
-                                   distCoeffs, repError);
-
-    if(!saveOk) {
-        cerr << "Cannot save output file" << endl;
-        return 0;
-    }
-
-    cout << "Rep Error: " << repError << endl;
-    cout << "Calibration saved to " << outputFile << endl;
 
     return 0;
 }
