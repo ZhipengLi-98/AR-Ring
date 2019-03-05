@@ -15,7 +15,7 @@ import threading
 import copy
 import madgwickahrs
 
-ser = serial.Serial('COM3', 500000)
+ser = serial.Serial('COM5', 500000)
 
 threads = []
 threadLock = threading.Lock()
@@ -31,6 +31,10 @@ c_acc = []
 c_gyr = []
 c_mag = []
 c_touch = []
+
+saveQ = []
+saveT = []
+saveS = []
 
 frames = Frames()
 mad = madgwickahrs.MadgwickAHRS()
