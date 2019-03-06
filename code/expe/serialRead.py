@@ -5,8 +5,6 @@ from matplotlib import pyplot as plt
 import math
 import numpy as np
 import pandas as pd
-from point import Point
-from frames import Frames
 import scipy.signal as signal
 from sklearn.decomposition import PCA
 from scipy.stats import skew, kurtosis
@@ -20,10 +18,11 @@ timestamp = []
 acc = []
 gyr = []
 mag = []
-qua = []
+qua = []    
 touch = []
 
 fileName = "test.txt"
+config = "C:\Users\pc\Desktop\lzp\System\\x64\Release\config.txt"
 
 mad = madgwickahrs.MadgwickAHRS()
 
@@ -41,6 +40,7 @@ def gravity_compensate(q, acc):
 def serialRead():
     start = time.time()
     clk = time.time()
+    f = open(fileName, "a")
     while True:
         # print (clk - start)
         s = ser.read()
@@ -65,8 +65,9 @@ def serialRead():
                 qTemp = mad.quaternion
                 accR = gravity_compensate(qTemp, ma)
                 
-                f = open(fileName, "a")
                 f.write(str(int(round(time.time() * 1000))))
+                f.write(" ")
+                f.write(str(int(temp[0])))
                 f.write(" ")
                 f.write(str(float(temp[1])*math.pi/180.0))
                 f.write(" ")
@@ -74,11 +75,11 @@ def serialRead():
                 f.write(" ")
                 f.write(str(float(temp[3])*math.pi/180.0))
                 f.write(" ")
-                f.write(str(float(temp[4])/256.0))
+                f.write(str(float(accR[0])))
                 f.write(" ")
-                f.write(str(float(temp[5])/256.0))
+                f.write(str(float(accR[1])))
                 f.write(" ")
-                f.write(str(float(temp[6])/256.0))
+                f.write(str(float(accR[2])))
                 f.write(" ")
                 f.write(str(qTemp[0]))
                 f.write(" ")
@@ -90,26 +91,14 @@ def serialRead():
                 f.write(" ")
                 f.write(str(int(temp[7])))
                 f.write("\n")
-                f.close()
-
-                timestamp.append(int(round(time.time() * 1000)))
-                gyr.append(float(temp[1])*math.pi/180.0)
-                gyr.append(float(temp[2])*math.pi/180.0)
-                gyr.append(float(temp[3])*math.pi/180.0)
-                # acc.append(Point(temp[4], temp[5], temp[6]))
-                acc.append(float(temp[4])/256.0)
-                acc.append(float(temp[5])/256.0)
-                acc.append(float(temp[6])/256.0)
-                # mag.append(Point(temp[7], temp[8], temp[9]))
-                qua.append(qTemp[0])
-                qua.append(qTemp[1])
-                qua.append(qTemp[2])
-                qua.append(qTemp[3])
-                touch.append(int(temp[7]))
         
         clk = time.time()
 
 
 if __name__ == '__main__':
+    configuration = open(config, "r")
+    fileName = configuration.read()
+    fileName = fileName + ".txt"
+
     serialRead()
 
