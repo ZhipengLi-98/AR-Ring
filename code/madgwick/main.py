@@ -56,14 +56,24 @@ if __name__ == '__main__':
             touch.append(int(data[10]))
             gyr = [float(data[1])*math.pi/180.0, float(data[2])*math.pi/180.0, float(data[3])*math.pi/180.0]
             acc = [float(data[4])/256.0, float(data[5])/256.0, float(data[6])/256.0]
+            print float(data[4])/256.0
+            print float(data[5])/256.0
+            print float(data[6])/256.0
             mag = [data[7], data[8], data[9]]
             mad.update(gyr, acc, mag)
             #print(q.q0, q.q1, q.q2, q.q3)
             qTemp = mad.quaternion
+            print qTemp[0]
+            print qTemp[1]
+            print qTemp[2]
+            print qTemp[3]
             acc = [float(data[4])/256.0, float(data[5])/256.0, float(data[6])/256.0]
             accR = gravity_compensate(qTemp, acc)
+            print accR[0]
+            print accR[1]
+            print accR[2]
             # accR = acc
-            for i in accR:
+            for i in acc:
                 ans.append(i)
             #print(u"Acc Real")
             #print(accR)
