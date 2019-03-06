@@ -133,5 +133,11 @@ class MadgwickAHRS:
         qdot = (q * Quaternion(0, gyroscope[0], gyroscope[1], gyroscope[2])) * 0.5 - self.beta * step.T
 
         # Integrate to yield quaternion
+        self.samplePeriod = 1.0/200.0
         q += qdot * self.samplePeriod
+        print self.samplePeriod
+        print q[0]
+        print q[1]
+        print q[2]
+        print q[3]
         self.quaternion = Quaternion(q / norm(q))  # normalise quaternion

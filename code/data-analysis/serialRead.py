@@ -15,7 +15,7 @@ import threading
 import copy
 import madgwickahrs
 
-ser = serial.Serial('COM5', 500000)
+ser = serial.Serial('COM3', 500000)
 
 threads = []
 threadLock = threading.Lock()
@@ -112,7 +112,6 @@ def gravity_compensate(q, acc):
     g[0] = 2 * (q[1] * q[3] - q[0] * q[2])
     g[1] = 2 * (q[0] * q[1] + q[2] * q[3])
     g[2] = q[0] * q[0] - q[1] * q[1] - q[2] * q[2] + q[3] * q[3]
-
     # compensate accelerometer readings with the expected direction of gravity
     return [acc[0] - g[0], acc[1] - g[1], acc[2] - g[2]]
 
@@ -144,17 +143,20 @@ def serialRead():
 
                     mg = [float(temp[1])*math.pi/180.0, float(temp[2])*math.pi/180.0, float(temp[3])*math.pi/180.0]
                     ma = [float(temp[4])/256.0, float(temp[5])/256.0, float(temp[6])/256.0]
+
                     # mm = [temp[7], temp[8], temp[9]]
+                    
 
                     # mad.update(mg, ma, mm)
                     mad.update_imu(mg, ma)
-                    #print(q.q0, q.q1, q.q2, q.q3)
                     qTemp = mad.quaternion
+
+
                     accR = gravity_compensate(qTemp, ma)
 
                     timestamp.append(int(temp[0]))
                     gyr.append(Point(temp[1], temp[2], temp[3]))
-                    # acc.append(Point(temp[4], temp[5], temp[6]))
+                    # acc.append(Point(ma[0], ma[1], ma[2]))
                     acc.append(Point(accR[0], accR[1], accR[2]))
                     # mag.append(Point(temp[7], temp[8], temp[9]))
                     touch.append(int(temp[7]))

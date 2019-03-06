@@ -72,9 +72,6 @@ class Frames:
 
 	def fix_acc(self):
 		x, y, z = Point.points_2_xyz(self.acc)
-		x -= np.median(x)
-		y -= np.median(y)
-		z -= np.median(z)
 		self.acc = Point.xyz_2_points(x, y, z)
 		#self.acc = self.kalman_filter(self.acc)
 
