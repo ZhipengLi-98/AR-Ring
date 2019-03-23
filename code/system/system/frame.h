@@ -16,8 +16,23 @@ using namespace cv;
 #define markersSep 0.01
 #define markersDic 0
 
+class Frame;
+
 Vec3d _rvec;
 Vec3d _tvec;
+vector<Frame> frames;
+
+double curIndex_x = 0;
+double lastIndex_x = 0;
+double curIndex_y = 0;
+double lastIndex_y = 0;
+double curIndex_z = 0;
+double lastIndex_z = 0;
+
+int leftTouch = 0;
+int rightTouch = 0;
+int _leftTouch = 0;
+int _rightTouch = 0;
 
 class Bone {
 public:
@@ -167,7 +182,18 @@ public:
 	// Vec3d _rvec;
 	// Vec3d _tvec;
 	void* data;
+	std::queue<int> rects;
 public:
+	Image() {
+		for (int i = 0; i < 3; i++) {
+			if (rand() % 2 == 0) {
+				rects.push(1);
+			}
+			else {
+				rects.push(0);
+			}
+		}
+	}
 	int readCameraParameters(string filename, Mat &camMatrix, Mat &distCoeffs) {
 		FileStorage fs(filename, FileStorage::READ);
 		if (!fs.isOpened())
@@ -258,6 +284,93 @@ public:
 				error_cnt++;
 			}
 		}
+		aruco::drawAxis(imageCopy, camMatrix, distCoeffs, _rvec, _tvec, axisLength);
+
+
+		// 画出游戏界面
+
+		cv::line(imageCopy, cv::Point(350, 0), cv::Point(350, 240), cv::Scalar(0, 0, 0), 2);
+		cv::line(imageCopy, cv::Point(400, 0), cv::Point(400, 240), cv::Scalar(0, 0, 0), 2);
+		cv::line(imageCopy, cv::Point(450, 0), cv::Point(450, 240), cv::Scalar(0, 0, 0), 2);
+
+		cv::rectangle(imageCopy, cv::Point(352, 0), cv::Point(398, 120), cv::Scalar(255, 0, 0), -1);
+		cv::rectangle(imageCopy, cv::Point(402, 0), cv::Point(448, 120), cv::Scalar(255, 0, 0), -1);
+
+		for (int i = 0; i < 3; i++) {
+			int t = rects.front();
+			rects.pop();
+			rects.push(t);
+			if (t == 0) {
+				cv::rectangle(imageCopy, cv::Point(352, (3 - i ) * 40), cv::Point(398, (2 - i) * 40), cv::Scalar(0, 0, 0), -1);
+			}
+			else {
+				cv::rectangle(imageCopy, cv::Point(402, (3 - i) * 40), cv::Point(448, (2 - i) * 40), cv::Scalar(0, 0, 0), -1);
+			}
+		}
+
+		// 检查串口数据
+
+		// 根据pos计算cv上的touch
+
+		if (frames.size() > 0) {
+			Frame current = frames.back();
+			curIndex_x = current.fingers[1].bones[3].realNext.at<double>(0);
+			curIndex_y = current.fingers[1].bones[3].realNext.at<double>(1);
+			curIndex_z = current.fingers[1].bones[3].realNext.at<double>(2);
+			// std::cout << curIndex_x << std::endl;
+			// std::cout << curIndex_z << std::endl;
+			// std::cout << std::endl;
+			if (leftTouch == 0 && lastIndex_z > 10.0 && curIndex_z < 10.0 && curIndex_x <100.0) {
+				leftTouch = 1;
+				// std::cout << "leftTouch" << std::endl;
+			}
+			else if (leftTouch == 1 && lastIndex_z < 10.0 && curIndex_z > 10.0) {
+				leftTouch = 0;
+				_leftTouch = 1;
+				std::cout << "_leftTouch" << std::endl;
+			}
+			if (rightTouch == 0 && lastIndex_z > 10.0 && curIndex_z < 10.0 && curIndex_x > 100.0) {
+				rightTouch = 1;
+				// std::cout << "rightTouch" << std::endl;
+			}
+			else if (rightTouch == 1 && lastIndex_z < 10.0 && curIndex_z > 10.0) {
+				rightTouch = 0;
+				_rightTouch = 1;
+				std::cout << "_rightTouch" << std::endl;
+			}
+
+			lastIndex_x = curIndex_x;
+			lastIndex_y = curIndex_y;
+			lastIndex_z = curIndex_z;
+		}
+
+		// 游戏逻辑
+		
+		if (_leftTouch == 1) {
+			_leftTouch = 0;
+			if (rects.front() == 0) {
+				rects.pop();
+				if (rand() % 2 == 0) {
+					rects.push(0);
+				}
+				else {
+					rects.push(1);
+				}
+			}
+		}
+		else if (_rightTouch == 1 && rects.front() == 1) {
+			_rightTouch = 0;
+			if (rects.front() == 1) {
+				rects.pop();
+				if (rand() % 2 == 0) {
+					rects.push(0);
+				}
+				else {
+					rects.push(1);
+				}
+			}
+		}
+
 		// std::cout << _rvec << std::endl;
 		double arg1 = ((double*)camMatrix.data)[0];
 		double arg2 = ((double*)camMatrix.data)[2];
@@ -299,8 +412,6 @@ public:
 				cv::Scalar(255, 0, 0),
 				2);
 		}
-
-		aruco::drawAxis(imageCopy, camMatrix, distCoeffs, _rvec, _tvec, axisLength);
 
 		Mat dst = Mat::zeros(480, 640, CV_8UC3);
 		resize(imageCopy, dst, dst.size());

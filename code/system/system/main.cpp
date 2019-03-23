@@ -18,7 +18,6 @@
 int cnt = 0;
 int flag = 0;
 
-vector<Frame> frames;
 string name;
 
 long long start;
@@ -207,8 +206,8 @@ static void solve_distortion(unsigned char* in_raw, float* in_distortion, int in
 	memcpy(in_raw, destination, 640 * 240 * sizeof(unsigned char));
 }
 
+Image img;
 static void OnImage(const LEAP_IMAGE_EVENT *image) {
-	Image img;
 	solve_distortion((unsigned char*)image->image[0].data, (float*)image->image[0].distortion_matrix, 64);
 	int temp = img.display(image->image[0].properties.width, image->image[0].properties.height, image->image[0].data, image->image[1].data);
 	if (temp != -1) {
