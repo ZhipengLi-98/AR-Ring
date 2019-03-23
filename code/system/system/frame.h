@@ -12,8 +12,8 @@ using namespace cv;
 
 #define markersX 1
 #define markersY 1
-#define markersLen 0.127              
-#define markersSep 0.02
+#define markersLen 0.1973             
+#define markersSep 0.01
 #define markersDic 0
 
 Vec3d _rvec;
@@ -67,13 +67,19 @@ public:
 	Mat realDirection;
 };
 
+double index_x, index_y, index_z;
+double palm_x, palm_y, palm_z;
+double fin_x[5][5], fin_y[5][5], fin_z[5][5];
+
 class Frame {
 public:
 	double grab_angle;
 	double grab_strength;
 	Palm palm;
 	Finger fingers[5];
-	double timestamp = 0.0;
+	long long timestamp;
+	Vec3d tv;
+	Vec3d rv;
 public:
 	Frame() {
 
@@ -87,8 +93,13 @@ public:
 		for (int i = 0; i < 5; i++) {
 			fingers[i] = digits[i];
 		}
+		tv = _tvec;
+		rv = _rvec;
 	}
 	Mat calc(Point3D point, int flag) {
+		if (flag) {
+			point.x -= 25;
+		}
 		cv::Mat rMat;
 		cv::Rodrigues(_rvec, rMat);
 		Vec4d pos(-point.x, point.z, point.y, 1); // 若识别到朝上
@@ -100,12 +111,17 @@ public:
 		T = T.inv();
 		Mat posMat = Mat(pos);
 		Mat ans = T * posMat;
+		ans.at<double>(2, 0) = ans.at<double>(2, 0) - T.at<double>(2, 3) * 0.22 + 40;
 		return ans;
 	}
 	void convert() {
 		palm.realPos = calc(palm.pos, 1);
 		palm.realNormal = calc(palm.normal, 0);
 		palm.realDirection = calc(palm.direction, 0);
+
+		palm_x = palm.pos.x - 25;
+		palm_y = palm.pos.y;
+		palm_z = palm.pos.z;
 	
 		/*
 		double temp = palm.realDirection.at<double>(0, 0) * palm.realDirection.at<double>(0, 0)
@@ -120,10 +136,29 @@ public:
 				fingers[i].bones[j].realNext = calc(fingers[i].bones[j].next, 1);
 				fingers[i].bones[j].realPrev = calc(fingers[i].bones[j].prev, 1);
 				// std::cout << fingers[i].bones[j].realNext << std::endl << fingers[i].bones[j].realPrev << std::endl;
+
+				if (j == 0) {
+					fin_x[i][j] = fingers[i].bones[j].prev.x - 25;
+					fin_y[i][j] = fingers[i].bones[j].prev.y;
+					fin_z[i][j] = fingers[i].bones[j].prev.z;
+				}
+
+				fin_x[i][j + 1] = fingers[i].bones[j].next.x - 25;
+				fin_y[i][j + 1] = fingers[i].bones[j].next.y;
+				fin_z[i][j + 1] = fingers[i].bones[j].next.z;
+
+				if (i == 1 && j == 3) {
+					index_x = fingers[i].bones[j].next.x - 25;
+					index_y = fingers[i].bones[j].next.y;
+					index_z = fingers[i].bones[j].next.z;
+					cv::Mat rMat;
+					cv::Rodrigues(_rvec, rMat);
+					// printf("%lf\n", fingers[i].bones[j].realNext.at<double>(2, 0));
+					//std::cout << fingers[i].bones[j].realNext << std::endl;
+				}
 			}
 			// std::cout << std::endl;
 		}
-
 	}
 };
 
@@ -132,7 +167,6 @@ public:
 	// Vec3d _rvec;
 	// Vec3d _tvec;
 	void* data;
-	double timestamp = 0.0;
 public:
 	int readCameraParameters(string filename, Mat &camMatrix, Mat &distCoeffs) {
 		FileStorage fs(filename, FileStorage::READ);
@@ -144,10 +178,11 @@ public:
 	}
 
 	// aruco 识别 校准
-	void display(int width, int height, void* dataA, void* dataB) {
+	int display(int width, int height, void* dataA, void* dataB) {
+
 		// cout << "display()" << endl;
 		Mat image = Mat(height, width, CV_8UC1, dataA);
-		Mat matB = Mat(height, width, CV_8UC1, dataB);
+		//Mat matB = Mat(height, width, CV_8UC1, dataB);
 		// imshow("image0", image);
 		// imshow("image1", matB);
 		// waitKey(1);
@@ -168,7 +203,7 @@ public:
 				image.at<uchar>(r, c) = (image.at<uchar>(r, c) - minColor) * span;
 			}
 		}
-		image *= 2;
+		//image *= 2;
 		
 		Mat imageCopy;
 
@@ -189,41 +224,108 @@ public:
 		int readOk = readCameraParameters(std::string("calibrate.txt"), camMatrix, distCoeffs);
 		if (readOk == 0) {
 			cerr << "Invalid camera file" << endl;
-			return;
+			return -1;
 		}
+
 
 		Ptr<aruco::DetectorParameters> detectorParams = aruco::DetectorParameters::create();
-		detectorParams->cornerRefinementMethod = aruco::CORNER_REFINE_SUBPIX; // do corner refinement in ma
 
 		// detect markers
-		aruco::detectMarkers(image, dictionary, corners, ids, detectorParams, rejected);
+		try {
+			detectorParams->cornerRefinementMethod = aruco::CORNER_REFINE_CONTOUR;
+			aruco::detectMarkers(image, dictionary, corners, ids, detectorParams, rejected);
+		} catch (Exception e) {
+			std::cout << "Haha" << std::endl;
+			detectorParams->cornerRefinementMethod = aruco::CORNER_REFINE_SUBPIX;
+			aruco::detectMarkers(image, dictionary, corners, ids, detectorParams, rejected);
+		}
 		aruco::refineDetectedMarkers(image, board, corners, ids, rejected);
 
-		// estimate board pose
-		int markersOfBoardDetected = 0;
-		if (ids.size() == 1)
-			markersOfBoardDetected =
-			aruco::estimatePoseBoard(corners, ids, board, camMatrix, distCoeffs, rvec, tvec);
+		static int error_cnt = 0;
+		static float error_t = 0.05;
 
-		// draw results
+		// estimate board pose
 		image.copyTo(imageCopy);
 		if (ids.size() == 1) {
-			aruco::drawDetectedMarkers(imageCopy, corners, ids);
+			aruco::estimatePoseBoard(corners, ids, board, camMatrix, distCoeffs, rvec, tvec);
+			if ((abs(_rvec[0] - rvec[0]) < error_t && abs(_rvec[1] - rvec[1]) < error_t && abs(_rvec[2] - rvec[2]) < error_t) || error_cnt >= 5) {
+				aruco::drawDetectedMarkers(imageCopy, corners, ids);
+				_rvec = rvec;
+				_tvec = tvec;
+				error_cnt = 0;
+			}
+			else {
+				error_cnt++;
+			}
+		}
+		// std::cout << _rvec << std::endl;
+		double arg1 = ((double*)camMatrix.data)[0];
+		double arg2 = ((double*)camMatrix.data)[2];
+		double arg3 = ((double*)camMatrix.data)[4];
+		double arg4 = ((double*)camMatrix.data)[5];
+		cv::circle(imageCopy, cv::Point(-palm_x / palm_y * arg1 + arg2, palm_z / palm_y * arg3 + arg4), 2, cv::Scalar(0, 255, 255), 2);
+
+		for (int i = 0; i < 5; i++) {
+			for (int j = 0; j < 5; j++) {
+				cv::circle(imageCopy, cv::Point(-fin_x[i][j] / fin_y[i][j] * arg1 + arg2, fin_z[i][j] / fin_y[i][j] * arg3 + arg4), 2, cv::Scalar(0, 0, 255), 2);
+				
+				if (j > 0 && j < 4) {
+					cv::line(imageCopy, 
+						cv::Point(-fin_x[i][j] / fin_y[i][j] * arg1 + arg2, fin_z[i][j] / fin_y[i][j] * arg3 + arg4),
+						cv::Point(-fin_x[i][j + 1] / fin_y[i][j + 1] * arg1 + arg2, fin_z[i][j + 1] / fin_y[i][j + 1] * arg3 + arg4), 
+						cv::Scalar(255, 0, 0), 
+						2);
+				}
+
+				if (j == 0 && (i == 0 || i == 1 || i == 4)) {
+					cv::line(imageCopy,
+						cv::Point(-fin_x[i][j] / fin_y[i][j] * arg1 + arg2, fin_z[i][j] / fin_y[i][j] * arg3 + arg4),
+						cv::Point(-fin_x[i][j + 1] / fin_y[i][j + 1] * arg1 + arg2, fin_z[i][j + 1] / fin_y[i][j + 1] * arg3 + arg4),
+						cv::Scalar(255, 0, 0),
+						2);
+				}
+			}
 		}
 
-		/*
-		if (rejected.size() > 0)
-			aruco::drawDetectedMarkers(imageCopy, rejected, noArray(), Scalar(100, 0, 255));
-			*/
-		if (markersOfBoardDetected == 1)
-			aruco::drawAxis(imageCopy, camMatrix, distCoeffs, rvec, tvec, axisLength);
-		//if (ids.size() == 1)
-		if (ids.size() == 1) {
-			_rvec = rvec;
-			_tvec = tvec;
+		for (int i = 1; i < 4; i++) {
+			cv::line(imageCopy,
+				cv::Point(-fin_x[i][0] / fin_y[i][0] * arg1 + arg2, fin_z[i][0] / fin_y[i][0] * arg3 + arg4),
+				cv::Point(-fin_x[i + 1][0] / fin_y[i + 1][0] * arg1 + arg2, fin_z[i + 1][0] / fin_y[i + 1][0] * arg3 + arg4),
+				cv::Scalar(255, 0, 0),
+				2);
+			cv::line(imageCopy,
+				cv::Point(-fin_x[i][1] / fin_y[i][1] * arg1 + arg2, fin_z[i][1] / fin_y[i][1] * arg3 + arg4),
+				cv::Point(-fin_x[i + 1][1] / fin_y[i + 1][1] * arg1 + arg2, fin_z[i + 1][1] / fin_y[i + 1][1] * arg3 + arg4),
+				cv::Scalar(255, 0, 0),
+				2);
 		}
 
-			imshow("out", imageCopy);
-		waitKey(1);
+		aruco::drawAxis(imageCopy, camMatrix, distCoeffs, _rvec, _tvec, axisLength);
+
+		Mat dst = Mat::zeros(480, 640, CV_8UC3);
+		resize(imageCopy, dst, dst.size());
+
+		imshow("out", dst);
+
+		char key = (char)waitKey(1);
+		if (key == 's') {
+			// start
+			return 1;
+		}
+		else if (key == 'n') {
+			// next
+			return 2;
+		}
+		else if (key == 'r') {
+			// redo
+			return 3;
+		}
+		else if (key == 'q') {
+			// quit
+			return 4;
+		}
+		else {
+			return -1;
+		}
 	}
 };
