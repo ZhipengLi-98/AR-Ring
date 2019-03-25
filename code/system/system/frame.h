@@ -308,9 +308,17 @@ public:
 			}
 		}
 
-		// 检查串口数据
+		// 根据串口数据传入model获取ring的touch
 
 		// 根据pos计算cv上的touch
+		double arg1 = ((double*)camMatrix.data)[0];
+		double arg2 = ((double*)camMatrix.data)[2];
+		double arg3 = ((double*)camMatrix.data)[4];
+		double arg4 = ((double*)camMatrix.data)[5];
+
+		// cv::Point(-fin_x[1][3] / fin_y[1][3] * arg1 + arg2, fin_z[1][3] / fin_y[1][3] * arg3 + arg4);
+
+		// std::cout << -fin_x[1][3] / fin_y[1][3] * arg1 + arg2 << std::endl;
 
 		if (frames.size() > 0) {
 			Frame current = frames.back();
@@ -320,7 +328,7 @@ public:
 			// std::cout << curIndex_x << std::endl;
 			// std::cout << curIndex_z << std::endl;
 			// std::cout << std::endl;
-			if (leftTouch == 0 && lastIndex_z > 10.0 && curIndex_z < 10.0 && curIndex_x <100.0) {
+			if (leftTouch == 0 && lastIndex_z > 10.0 && curIndex_z < 10.0 && -fin_x[1][3] / fin_y[1][3] * arg1 + arg2 < 400.0) {
 				leftTouch = 1;
 				// std::cout << "leftTouch" << std::endl;
 			}
@@ -329,7 +337,7 @@ public:
 				_leftTouch = 1;
 				std::cout << "_leftTouch" << std::endl;
 			}
-			if (rightTouch == 0 && lastIndex_z > 10.0 && curIndex_z < 10.0 && curIndex_x > 100.0) {
+			if (rightTouch == 0 && lastIndex_z > 10.0 && curIndex_z < 10.0 && -fin_x[1][3] / fin_y[1][3] * arg1 + arg2 > 400.0) {
 				rightTouch = 1;
 				// std::cout << "rightTouch" << std::endl;
 			}
@@ -372,10 +380,7 @@ public:
 		}
 
 		// std::cout << _rvec << std::endl;
-		double arg1 = ((double*)camMatrix.data)[0];
-		double arg2 = ((double*)camMatrix.data)[2];
-		double arg3 = ((double*)camMatrix.data)[4];
-		double arg4 = ((double*)camMatrix.data)[5];
+
 		cv::circle(imageCopy, cv::Point(-palm_x / palm_y * arg1 + arg2, palm_z / palm_y * arg3 + arg4), 2, cv::Scalar(0, 255, 255), 2);
 
 		for (int i = 0; i < 5; i++) {
