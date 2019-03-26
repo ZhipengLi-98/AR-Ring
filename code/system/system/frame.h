@@ -29,10 +29,21 @@ double lastIndex_y = 0;
 double curIndex_z = 0;
 double lastIndex_z = 0;
 
-int leftTouch = 0;
-int rightTouch = 0;
-int _leftTouch = 0;
-int _rightTouch = 0;
+double curMiddle_x = 0;
+double lastMiddle_x = 0;
+double curMiddle_y = 0;
+double lastMiddle_y = 0;
+double curMiddle_z = 0;
+double lastMiddle_z = 0;
+
+int first = 0;
+int _first = 0;
+int second = 0;
+int _second = 0;
+int third = 0;
+int _third = 0;
+int fourth = 0;
+int _fourth = 0;
 
 class Bone {
 public:
@@ -185,13 +196,15 @@ public:
 	std::queue<int> rects;
 public:
 	Image() {
-		for (int i = 0; i < 3; i++) {
-			if (rand() % 2 == 0) {
-				rects.push(1);
+		std::cout << "Image()" << std::endl;
+		int last = -1;
+		for (int i = 0; i < 6; i++) {
+			int temp = rand() % 4;
+			while (temp == last) {
+				temp = rand() % 4;
 			}
-			else {
-				rects.push(0);
-			}
+			last = temp;
+			rects.push(temp);
 		}
 	}
 	int readCameraParameters(string filename, Mat &camMatrix, Mat &distCoeffs) {
@@ -284,28 +297,36 @@ public:
 				error_cnt++;
 			}
 		}
+		// std::cout << _rvec << " " << _tvec << std::endl;
+		// [2.21748, -2.18703, 0.083776] [0.254348, 0.109625, 0.211468]
+		_rvec[0] = 2.21748;
+		_rvec[1] = -2.18703;
+		_rvec[2] = 0.083776;
+		_tvec[0] = 0.254348;
+		_tvec[1] = 0.109625;
+		_tvec[2] = 0.211468;
 		aruco::drawAxis(imageCopy, camMatrix, distCoeffs, _rvec, _tvec, axisLength);
 
 
 		// 画出游戏界面
 
+		cv::line(imageCopy, cv::Point(250, 0), cv::Point(250, 240), cv::Scalar(0, 0, 0), 2);
+		cv::line(imageCopy, cv::Point(300, 0), cv::Point(300, 240), cv::Scalar(0, 0, 0), 2);
 		cv::line(imageCopy, cv::Point(350, 0), cv::Point(350, 240), cv::Scalar(0, 0, 0), 2);
 		cv::line(imageCopy, cv::Point(400, 0), cv::Point(400, 240), cv::Scalar(0, 0, 0), 2);
 		cv::line(imageCopy, cv::Point(450, 0), cv::Point(450, 240), cv::Scalar(0, 0, 0), 2);
 
-		cv::rectangle(imageCopy, cv::Point(352, 0), cv::Point(398, 120), cv::Scalar(255, 0, 0), -1);
-		cv::rectangle(imageCopy, cv::Point(402, 0), cv::Point(448, 120), cv::Scalar(255, 0, 0), -1);
+		cv::rectangle(imageCopy, cv::Point(252, 0), cv::Point(298, 240), cv::Scalar(255, 0, 0), -1);
+		cv::rectangle(imageCopy, cv::Point(302, 0), cv::Point(348, 240), cv::Scalar(255, 0, 0), -1);
+		cv::rectangle(imageCopy, cv::Point(352, 0), cv::Point(398, 240), cv::Scalar(255, 0, 0), -1);
+		cv::rectangle(imageCopy, cv::Point(402, 0), cv::Point(448, 240), cv::Scalar(255, 0, 0), -1);
 
-		for (int i = 0; i < 3; i++) {
+		for (int i = 0; i < 6; i++) {
 			int t = rects.front();
 			rects.pop();
 			rects.push(t);
-			if (t == 0) {
-				cv::rectangle(imageCopy, cv::Point(352, (3 - i ) * 40), cv::Point(398, (2 - i) * 40), cv::Scalar(0, 0, 0), -1);
-			}
-			else {
-				cv::rectangle(imageCopy, cv::Point(402, (3 - i) * 40), cv::Point(448, (2 - i) * 40), cv::Scalar(0, 0, 0), -1);
-			}
+
+			cv::rectangle(imageCopy, cv::Point(252 + t * 50, (3 - i) * 40), cv::Point(298 + t * 50, (2 - i) * 40), cv::Scalar(0, 0, 0), -1);
 		}
 
 		// 根据串口数据传入model获取ring的touch
@@ -322,29 +343,51 @@ public:
 
 		if (frames.size() > 0) {
 			Frame current = frames.back();
+
 			curIndex_x = current.fingers[1].bones[3].realNext.at<double>(0);
 			curIndex_y = current.fingers[1].bones[3].realNext.at<double>(1);
 			curIndex_z = current.fingers[1].bones[3].realNext.at<double>(2);
+
+			curMiddle_x = current.fingers[2].bones[3].realNext.at<double>(0);
+			curMiddle_y = current.fingers[2].bones[3].realNext.at<double>(1);
+			curMiddle_z = current.fingers[2].bones[3].realNext.at<double>(2);
+
 			// std::cout << curIndex_x << std::endl;
 			// std::cout << curIndex_z << std::endl;
 			// std::cout << std::endl;
-			if (leftTouch == 0 && lastIndex_z > 10.0 && curIndex_z < 10.0 && -fin_x[1][3] / fin_y[1][3] * arg1 + arg2 < 400.0) {
-				leftTouch = 1;
-				// std::cout << "leftTouch" << std::endl;
+			double fingerPos = -fin_x[1][3] / fin_y[1][3] * arg1 + arg2;
+
+			if (first == 0 && lastIndex_z > 10.0 && curIndex_z < 10.0 && fingerPos < 300.0 && fingerPos > 250.0) {
+				first = 1;
 			}
-			else if (leftTouch == 1 && lastIndex_z < 10.0 && curIndex_z > 10.0) {
-				leftTouch = 0;
-				_leftTouch = 1;
-				std::cout << "_leftTouch" << std::endl;
+			else if (first == 1 && lastIndex_z < 10.0 && curIndex_z > 10.0) {
+				first = 0;
+				_first = 1;
+				std::cout << "first" << std::endl;
 			}
-			if (rightTouch == 0 && lastIndex_z > 10.0 && curIndex_z < 10.0 && -fin_x[1][3] / fin_y[1][3] * arg1 + arg2 > 400.0) {
-				rightTouch = 1;
-				// std::cout << "rightTouch" << std::endl;
+			if (second == 0 && lastIndex_z > 10.0 && curIndex_z < 10.0 && fingerPos < 350.0 && fingerPos > 300.0) {
+				second = 1;
 			}
-			else if (rightTouch == 1 && lastIndex_z < 10.0 && curIndex_z > 10.0) {
-				rightTouch = 0;
-				_rightTouch = 1;
-				std::cout << "_rightTouch" << std::endl;
+			else if (second == 1 && lastIndex_z < 10.0 && curIndex_z > 10.0) {
+				second = 0;
+				_second = 1;
+				std::cout << "second" << std::endl;
+			}
+			if (third == 0 && lastIndex_z > 10.0 && curIndex_z < 10.0 && fingerPos < 400.0 && fingerPos > 350.0) {
+				third = 1;
+			}
+			else if (third == 1 && lastIndex_z < 10.0 && curIndex_z > 10.0) {
+				third = 0;
+				_third = 1;
+				std::cout << "third" << std::endl;
+			}
+			if (fourth == 0 && lastIndex_z > 10.0 && curIndex_z < 10.0 && fingerPos < 450.0 && fingerPos > 400.0) {
+				fourth = 1;
+			}
+			else if (fourth == 1 && lastIndex_z < 10.0 && curIndex_z > 10.0) {
+				fourth = 0;
+				_fourth = 1;
+				std::cout << "fourth" << std::endl;
 			}
 
 			lastIndex_x = curIndex_x;
@@ -353,30 +396,46 @@ public:
 		}
 
 		// 游戏逻辑
-		
-		if (_leftTouch == 1) {
-			_leftTouch = 0;
-			if (rects.front() == 0) {
-				rects.pop();
-				if (rand() % 2 == 0) {
-					rects.push(0);
-				}
-				else {
-					rects.push(1);
-				}
+
+		if (_first == 1 && rects.front() == 0) {
+			_first = 0;
+			rects.pop();
+			int last = rects.back();
+			int temp = rand() % 4;
+			while (temp == last) {
+				temp = rand() % 4;
 			}
+			rects.push(temp);
 		}
-		else if (_rightTouch == 1 && rects.front() == 1) {
-			_rightTouch = 0;
-			if (rects.front() == 1) {
-				rects.pop();
-				if (rand() % 2 == 0) {
-					rects.push(0);
-				}
-				else {
-					rects.push(1);
-				}
+		else if (second == 1 && rects.front() == 1) {
+			_second = 0;
+			rects.pop();
+			int last = rects.back();
+			int temp = rand() % 4;
+			while (temp == last) {
+				temp = rand() % 4;
 			}
+			rects.push(temp);
+		}
+		else if (third == 1 && rects.front() == 2) {
+			_third = 0;
+			rects.pop();
+			int last = rects.back();
+			int temp = rand() % 4;
+			while (temp == last) {
+				temp = rand() % 4;
+			}
+			rects.push(temp);
+		}
+		else if (fourth == 1 && rects.front() == 3) {
+			_fourth = 0;
+			rects.pop();
+			int last = rects.back();
+			int temp = rand() % 4;
+			while (temp == last) {
+				temp = rand() % 4;
+			}
+			rects.push(temp);
 		}
 
 		// std::cout << _rvec << std::endl;
@@ -391,7 +450,7 @@ public:
 					cv::line(imageCopy, 
 						cv::Point(-fin_x[i][j] / fin_y[i][j] * arg1 + arg2, fin_z[i][j] / fin_y[i][j] * arg3 + arg4),
 						cv::Point(-fin_x[i][j + 1] / fin_y[i][j + 1] * arg1 + arg2, fin_z[i][j + 1] / fin_y[i][j + 1] * arg3 + arg4), 
-						cv::Scalar(255, 0, 0), 
+						cv::Scalar(128, 128, 128),
 						2);
 				}
 
@@ -399,9 +458,9 @@ public:
 					cv::line(imageCopy,
 						cv::Point(-fin_x[i][j] / fin_y[i][j] * arg1 + arg2, fin_z[i][j] / fin_y[i][j] * arg3 + arg4),
 						cv::Point(-fin_x[i][j + 1] / fin_y[i][j + 1] * arg1 + arg2, fin_z[i][j + 1] / fin_y[i][j + 1] * arg3 + arg4),
-						cv::Scalar(255, 0, 0),
+						cv::Scalar(128, 128, 128),
 						2);
-				}
+				}	
 			}
 		}
 
@@ -409,12 +468,12 @@ public:
 			cv::line(imageCopy,
 				cv::Point(-fin_x[i][0] / fin_y[i][0] * arg1 + arg2, fin_z[i][0] / fin_y[i][0] * arg3 + arg4),
 				cv::Point(-fin_x[i + 1][0] / fin_y[i + 1][0] * arg1 + arg2, fin_z[i + 1][0] / fin_y[i + 1][0] * arg3 + arg4),
-				cv::Scalar(255, 0, 0),
+				cv::Scalar(128, 128, 128),
 				2);
 			cv::line(imageCopy,
 				cv::Point(-fin_x[i][1] / fin_y[i][1] * arg1 + arg2, fin_z[i][1] / fin_y[i][1] * arg3 + arg4),
 				cv::Point(-fin_x[i + 1][1] / fin_y[i + 1][1] * arg1 + arg2, fin_z[i + 1][1] / fin_y[i + 1][1] * arg3 + arg4),
-				cv::Scalar(255, 0, 0),
+				cv::Scalar(128, 128, 128),
 				2);
 		}
 
