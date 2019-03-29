@@ -15,6 +15,7 @@ from sklearn.externals import joblib
 import serial
 import time
 import madgwickahrs
+import subprocess
 
 ser = serial.Serial('COM5', 500000)
 mad = madgwickahrs.MadgwickAHRS()
@@ -27,6 +28,7 @@ qua = []
 touch = []
 
 data = ''
+clf = joblib.load('clf.model')
 
 def gravity_compensate(q, acc):
     g = [0.0, 0.0, 0.0]
@@ -42,6 +44,7 @@ def gravity_compensate(q, acc):
 def serialRead():
     start = time.time()
     clk = time.time()
+    test = 0
     while True:
         # print (clk - start)
         s = ser.read()
@@ -63,7 +66,7 @@ def serialRead():
 
                 # mad.update(mg, ma, mm)
                 mad.update_imu(mg, ma)
-                #print(q.q0, q.q1, q.q2, q.q3)
+                # print(q.q0, q.q1, q.q2, q.q3)
                 qTemp = mad.quaternion
                 accR = gravity_compensate(qTemp, ma)
                 
@@ -93,9 +96,13 @@ def serialRead():
                 data += " "
                 data += str(int(temp[7]))
                 # data += "\n"
-                
+
+                # print(data)
                 result = predict(clf, data)
-                print(result)
+                if result == 1:
+                    test += 1
+                    print(test)
+                # print(result)
         
         clk = time.time()
 
@@ -164,6 +171,7 @@ def predict(clf, imu):
         imu_list.append(imu)
         return 0
 
+
 if __name__ == "__main__":
     #info, data, name_set, features = input(4, 'index1')
     #train(info, data)
@@ -179,6 +187,7 @@ if __name__ == "__main__":
         if predict(clf, line) == 1:
             print line
     '''
+    # pi= subprocess.Popen("C:/Users/pc/Desktop/lzp/System/x64/Release/System.exe",shell=True, stdout=subprocess.PIPE)
 
     clf = joblib.load('clf.model')
     serialRead()

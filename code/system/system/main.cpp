@@ -12,25 +12,23 @@
 #include <iostream>
 #include <string>
 
+
 // ´¹Ö± 0, Ë®Æ½ 1
 #define oritention 0
 
 int cnt = 0;
 int flag = 0;
+int writeDone = 0;
 
-string name;
+std::string name;
 
 long long start;
 
 static LEAP_CONNECTION* connectionHandle;
 
-void writeFrames(string fileName);
 
-long long getSystemTime() {
-	timeb t;
-	ftime(&t);
-	return t.time * 1000 + t.millitm;
-}
+void writeFrames(std::string fileName);
+
 
 /** Callback for when the connection opens. */
 static void OnConnect() {
@@ -206,37 +204,32 @@ static void solve_distortion(unsigned char* in_raw, float* in_distortion, int in
 	memcpy(in_raw, destination, 640 * 240 * sizeof(unsigned char));
 }
 
+void writeVisual(std::string fileName) {
+	std::ofstream fout(fileName);
+	for (int i = 0; i < timeStamps.size(); i++) {
+		fout << timeStamps[i] << " "
+			<< visual[i] << std::endl;
+	}
+	fout.close();
+	std::cout << "writeVisual" << std::endl;
+	writeDone = 1;
+}
+
 Image img;
 static void OnImage(const LEAP_IMAGE_EVENT *image) {
 	solve_distortion((unsigned char*)image->image[0].data, (float*)image->image[0].distortion_matrix, 64);
 	int temp = img.display(image->image[0].properties.width, image->image[0].properties.height, image->image[0].data, image->image[1].data);
-	if (temp != -1) {
-		flag = temp;
+	if (temp == 1 && writeDone == 0) {
+		writeVisual(std::string(name) + std::string("_Visual.txt"));
 	}
-	if (flag == 2) {
-		if (frames.size() > 0) {
-			writeFrames(string(name) + string("_") + to_string(cnt) + string(".txt"));
-			cnt++;
-			frames.clear();
-		}
-		flag = 1;
-		if (cnt > 9) {
-			flag = 4;
-		}
-		std::cout << "Next " << cnt << std::endl;
-		printMsg();
-	}
-	else if (flag == 3) {
+	/*
+	if (frames.size() > 0) {
+		writeFrames(std::string(name) + std::string("_") + std::to_string(cnt) + std::string(".txt"));
+		cnt++;
 		frames.clear();
-		flag = 1;
-		std::cout << "Redo " << cnt << std::endl;
-		printMsg();
 	}
-	else if (flag == 4) {
-		frames.clear();
-		flag = -1;
-		std::cout << "Quit " << cnt << std::endl;
-	}
+	*/
+
 	// std::cout << "flag: " << flag << std::endl;
 	/*
 	printf("Image %lli  => Left: %d x %d (bpp=%d), Right: %d x %d (bpp=%d)\n",
@@ -310,9 +303,9 @@ void OnHeadPose(const LEAP_HEAD_POSE_EVENT *event) {
 		event->head_orientation.z);
 }
 
-void writeFrames(string fileName) {
-	ofstream fout(fileName);
-	for (vector<Frame>::iterator iter = frames.begin(); iter != frames.end(); iter++) {
+void writeFrames(std::string fileName) {
+	std::ofstream fout(fileName);
+	for (std::vector<Frame>::iterator iter = frames.begin(); iter != frames.end(); iter++) {
 		fout << iter->timestamp << " "
 			<< iter->grab_angle << " "
 			<< iter->grab_strength << " "
@@ -342,7 +335,7 @@ void writeFrames(string fileName) {
 		}
 		fout << iter->rv(0) << " " << iter->rv(1) << " " << iter->rv(2) << " "
 			<< iter->tv(0) << " " << iter->tv(1) << " " << iter->tv(2);
-		fout << endl;
+		fout << std::endl;
 	}
 	fout.close();
 	std::cout << "Frames written" << std::endl;
@@ -358,12 +351,12 @@ int main(int argc, char** argv) {
 	ConnectionCallbacks.on_log_message = &OnLogMessage;
 	ConnectionCallbacks.on_head_pose = &OnHeadPose;
 
-	string file = "config.txt";
-	ifstream infile;
+	std::string file = "config.txt";
+	std::ifstream infile;
 	infile.open(file.data());
 	assert(infile.is_open());
 
-	getline(infile, name);
+	std::getline(infile, name);
 	infile.close();	
 
 	start = clock();

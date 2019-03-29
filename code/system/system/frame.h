@@ -4,10 +4,18 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/aruco.hpp>
 #include <opencv2/opencv.hpp>
+#include <fstream>
+#include <WinSock2.h>
+#include <stdio.h>
+#include <cstdlib>
+#include <sys/timeb.h>
 
 #include "point.h"
 
-using namespace std;
+
+#pragma comment(lib, "ws2_32.lib")
+
+// using namespace std;
 using namespace cv;
 
 #define markersX 1
@@ -16,11 +24,25 @@ using namespace cv;
 #define markersSep 0.01
 #define markersDic 0
 
+#define IMU
+// #define VISUAL
+
+#define THRESHOLD 10.0
+
+#define WIDTH 35
+#define BEGIN 250
+
 class Frame;
 
 Vec3d _rvec;
 Vec3d _tvec;
-vector<Frame> frames;
+std::vector<Frame> frames;
+
+std::vector<long long> timeStamps;
+std::vector<int> visual;
+
+double offset = 0.0;
+int offsetFlag = 0;
 
 double curIndex_x = 0;
 double lastIndex_x = 0;
@@ -36,6 +58,8 @@ double lastMiddle_y = 0;
 double curMiddle_z = 0;
 double lastMiddle_z = 0;
 
+int blackCnt = 0;
+
 int first = 0;
 int _first = 0;
 int second = 0;
@@ -44,6 +68,28 @@ int third = 0;
 int _third = 0;
 int fourth = 0;
 int _fourth = 0;
+
+int firstCnt = 0;
+int secondCnt = 0;
+int thirdCnt = 0;
+int fourthCnt = 0;
+
+int IMUresult = 0;
+int IMUflag = 1;
+int IMUcnt = 0;
+
+
+WSADATA wsaData;
+SOCKET sClient;
+SOCKADDR_IN server;
+char szMessage[1024];
+
+
+long long getSystemTime() {
+	timeb t;
+	ftime(&t);
+	return t.time * 1000 + t.millitm;
+}
 
 class Bone {
 public:
@@ -206,8 +252,27 @@ public:
 			last = temp;
 			rects.push(temp);
 		}
+
+		if (WSAStartup(0x0202, &wsaData) != 0) {
+			std::cout << "WSA ERROR" << std::endl;
+		}
+
+		sClient = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		if (sClient == INVALID_SOCKET) {
+			std::cout << "Invalid socket" << std::endl;
+		}
+
+		memset(&server, 0, sizeof(SOCKADDR_IN));      
+		server.sin_family = AF_INET; 
+		server.sin_port = htons(8888);
+		server.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
+
+		if (connect(sClient, (struct sockaddr *) &server, sizeof(SOCKADDR_IN)) != -1) {
+			std::cout << "Connect Success" << std::endl;
+		}
+		std::cout << WSAGetLastError() << std::endl;
 	}
-	int readCameraParameters(string filename, Mat &camMatrix, Mat &distCoeffs) {
+	int readCameraParameters(std::string filename, Mat &camMatrix, Mat &distCoeffs) {
 		FileStorage fs(filename, FileStorage::READ);
 		if (!fs.isOpened())
 			return 0;
@@ -246,8 +311,8 @@ public:
 		
 		Mat imageCopy;
 
-		vector< int > ids;
-		vector< vector< Point2f > > corners, rejected;
+		std::vector< int > ids;
+		std::vector< std::vector< Point2f > > corners, rejected;
 		Vec3d rvec, tvec;
 
 		Ptr<aruco::Dictionary> dictionary =
@@ -262,7 +327,7 @@ public:
 		Mat camMatrix, distCoeffs;
 		int readOk = readCameraParameters(std::string("calibrate.txt"), camMatrix, distCoeffs);
 		if (readOk == 0) {
-			cerr << "Invalid camera file" << endl;
+			std::cerr << "Invalid camera file" << std::endl;
 			return -1;
 		}
 
@@ -308,37 +373,117 @@ public:
 		aruco::drawAxis(imageCopy, camMatrix, distCoeffs, _rvec, _tvec, axisLength);
 
 
-		// 画出游戏界面
 
-		cv::line(imageCopy, cv::Point(250, 0), cv::Point(250, 240), cv::Scalar(0, 0, 0), 2);
-		cv::line(imageCopy, cv::Point(300, 0), cv::Point(300, 240), cv::Scalar(0, 0, 0), 2);
-		cv::line(imageCopy, cv::Point(350, 0), cv::Point(350, 240), cv::Scalar(0, 0, 0), 2);
-		cv::line(imageCopy, cv::Point(400, 0), cv::Point(400, 240), cv::Scalar(0, 0, 0), 2);
-		cv::line(imageCopy, cv::Point(450, 0), cv::Point(450, 240), cv::Scalar(0, 0, 0), 2);
+		cv::line(imageCopy, cv::Point(BEGIN, 0), cv::Point(BEGIN, 240), cv::Scalar(0, 0, 0), 2);
+		cv::line(imageCopy, cv::Point(BEGIN + 1 * WIDTH, 0), cv::Point(BEGIN + 1 * WIDTH, 240), cv::Scalar(0, 0, 0), 2);
+		cv::line(imageCopy, cv::Point(BEGIN + 2 * WIDTH, 0), cv::Point(BEGIN + 2 * WIDTH, 240), cv::Scalar(0, 0, 0), 2);
+		cv::line(imageCopy, cv::Point(BEGIN + 3 * WIDTH, 0), cv::Point(BEGIN + 3 * WIDTH, 240), cv::Scalar(0, 0, 0), 2);
+		cv::line(imageCopy, cv::Point(BEGIN + 4 * WIDTH, 0), cv::Point(BEGIN + 4 * WIDTH, 240), cv::Scalar(0, 0, 0), 2);
 
-		cv::rectangle(imageCopy, cv::Point(252, 0), cv::Point(298, 240), cv::Scalar(255, 0, 0), -1);
-		cv::rectangle(imageCopy, cv::Point(302, 0), cv::Point(348, 240), cv::Scalar(255, 0, 0), -1);
-		cv::rectangle(imageCopy, cv::Point(352, 0), cv::Point(398, 240), cv::Scalar(255, 0, 0), -1);
-		cv::rectangle(imageCopy, cv::Point(402, 0), cv::Point(448, 240), cv::Scalar(255, 0, 0), -1);
+
+		if (firstCnt == 0) {
+			cv::rectangle(imageCopy, cv::Point(BEGIN + 2, 0), cv::Point(BEGIN + 1 * WIDTH - 2, 240), cv::Scalar(255, 0, 0), -1);
+		}
+		else {
+			firstCnt--;
+			cv::rectangle(imageCopy, cv::Point(BEGIN + 2, 0), cv::Point(BEGIN + 1 * WIDTH - 2, 240), cv::Scalar(0, 0, 0), -1);
+		}
+		if (secondCnt == 0) {
+			cv::rectangle(imageCopy, cv::Point(BEGIN + 1 * WIDTH + 2, 0), cv::Point(BEGIN + 2 * WIDTH - 2, 240), cv::Scalar(255, 0, 0), -1);
+		}
+		else {
+			secondCnt--;
+			cv::rectangle(imageCopy, cv::Point(BEGIN + 1 * WIDTH + 2, 0), cv::Point(BEGIN + 2 * WIDTH - 2, 240), cv::Scalar(0, 0, 0), -1);
+		}
+		if (thirdCnt == 0) {
+			cv::rectangle(imageCopy, cv::Point(BEGIN + 2 * WIDTH + 2, 0), cv::Point(BEGIN + 3 * WIDTH - 2, 240), cv::Scalar(255, 0, 0), -1);
+		}
+		else {
+			thirdCnt--;
+			cv::rectangle(imageCopy, cv::Point(BEGIN + 2 * WIDTH + 2, 0), cv::Point(BEGIN + 3 * WIDTH - 2, 240), cv::Scalar(0, 0, 0), -1);
+		}
+		if (fourthCnt == 0) {
+			cv::rectangle(imageCopy, cv::Point(BEGIN + 3 * WIDTH + 2, 0), cv::Point(BEGIN + 4 * WIDTH - 2, 240), cv::Scalar(255, 0, 0), -1);
+		}
+		else {
+			fourthCnt--;
+			cv::rectangle(imageCopy, cv::Point(BEGIN + 3 * WIDTH + 2, 0), cv::Point(BEGIN + 4 * WIDTH - 2, 240), cv::Scalar(0, 0, 0), -1);
+		}
 
 		for (int i = 0; i < 6; i++) {
 			int t = rects.front();
 			rects.pop();
 			rects.push(t);
 
-			cv::rectangle(imageCopy, cv::Point(252 + t * 50, (3 - i) * 40), cv::Point(298 + t * 50, (2 - i) * 40), cv::Scalar(0, 0, 0), -1);
+			cv::rectangle(imageCopy, cv::Point(BEGIN + 2 + t * WIDTH, (3 - i) * 40), cv::Point(BEGIN + WIDTH - 2 + t * WIDTH, (2 - i) * 40), cv::Scalar(0, 0, 0), -1);
 		}
 
-		// 根据串口数据传入model获取ring的touch
-
-		// 根据pos计算cv上的touch
 		double arg1 = ((double*)camMatrix.data)[0];
 		double arg2 = ((double*)camMatrix.data)[2];
 		double arg3 = ((double*)camMatrix.data)[4];
 		double arg4 = ((double*)camMatrix.data)[5];
+#ifdef IMU
 
+		char recvData[255];
+		int r = recv(sClient, recvData, 1024, 0);
+		// std::cout << r << std::endl;
+		if (r > 0) {
+			IMUresult = 0;
+			for (int i = 0; i < r; i++) {
+				int temp = recvData[i] - '0';
+				if (temp == 1) {
+					// std::cout << temp << std::endl;
+					IMUresult = 1;
+				}
+			}
+		}
+
+		_first = 0;
+		_second = 0;
+		_third = 0;
+		_fourth = 0;
+		if (IMUresult) {
+			if (frames.size() > 0) {
+				Frame current = frames.back();
+
+				curIndex_x = current.fingers[1].bones[3].realNext.at<double>(0);
+				curIndex_y = current.fingers[1].bones[3].realNext.at<double>(1);
+				curIndex_z = current.fingers[1].bones[3].realNext.at<double>(2);
+
+				curMiddle_x = current.fingers[2].bones[3].realNext.at<double>(0);
+				curMiddle_y = current.fingers[2].bones[3].realNext.at<double>(1);
+				curMiddle_z = current.fingers[2].bones[3].realNext.at<double>(2);
+
+
+				double fingerPos = -fin_x[1][3] / fin_y[1][3] * arg1 + arg2;
+				std::cout << fingerPos << std::endl;
+				if (fingerPos < BEGIN + 1 * WIDTH && fingerPos > BEGIN) {
+					_first = 1;
+					std::cout << "first" << std::endl;
+				}
+				if (fingerPos < BEGIN + 2 * WIDTH && fingerPos > BEGIN + 1 * WIDTH) {
+					_second = 1;
+					std::cout << "second" << std::endl;
+				}
+				if (fingerPos < BEGIN + 3 * WIDTH && fingerPos > BEGIN + 2 * WIDTH) {
+					_third = 1;
+					std::cout << "third" << std::endl;
+				}
+				if (fingerPos < BEGIN + 4 * WIDTH && fingerPos > BEGIN + 3 * WIDTH) {
+					_fourth = 1;
+					std::cout << "fourth" << std::endl;
+				}
+
+				lastIndex_x = curIndex_x;
+				lastIndex_y = curIndex_y;
+				lastIndex_z = curIndex_z;
+			}
+		}
+
+#endif // IMU
+
+#ifdef VISUAL
 		// cv::Point(-fin_x[1][3] / fin_y[1][3] * arg1 + arg2, fin_z[1][3] / fin_y[1][3] * arg3 + arg4);
-
 		// std::cout << -fin_x[1][3] / fin_y[1][3] * arg1 + arg2 << std::endl;
 
 		if (frames.size() > 0) {
@@ -346,45 +491,50 @@ public:
 
 			curIndex_x = current.fingers[1].bones[3].realNext.at<double>(0);
 			curIndex_y = current.fingers[1].bones[3].realNext.at<double>(1);
-			curIndex_z = current.fingers[1].bones[3].realNext.at<double>(2);
+			curIndex_z = current.fingers[1].bones[3].realNext.at<double>(2) - offset;
 
 			curMiddle_x = current.fingers[2].bones[3].realNext.at<double>(0);
 			curMiddle_y = current.fingers[2].bones[3].realNext.at<double>(1);
 			curMiddle_z = current.fingers[2].bones[3].realNext.at<double>(2);
+
+			_first = 0;
+			_second = 0;
+			_third = 0;
+			_fourth = 0;
 
 			// std::cout << curIndex_x << std::endl;
 			// std::cout << curIndex_z << std::endl;
 			// std::cout << std::endl;
 			double fingerPos = -fin_x[1][3] / fin_y[1][3] * arg1 + arg2;
 
-			if (first == 0 && lastIndex_z > 10.0 && curIndex_z < 10.0 && fingerPos < 300.0 && fingerPos > 250.0) {
+			if (first == 0 && lastIndex_z > THRESHOLD && curIndex_z < THRESHOLD && fingerPos < BEGIN + 1 * WIDTH && fingerPos > BEGIN) {
 				first = 1;
 			}
-			else if (first == 1 && lastIndex_z < 10.0 && curIndex_z > 10.0) {
+			else if (first == 1 && lastIndex_z < THRESHOLD && curIndex_z > THRESHOLD) {
 				first = 0;
 				_first = 1;
 				std::cout << "first" << std::endl;
 			}
-			if (second == 0 && lastIndex_z > 10.0 && curIndex_z < 10.0 && fingerPos < 350.0 && fingerPos > 300.0) {
+			if (second == 0 && lastIndex_z > THRESHOLD && curIndex_z < THRESHOLD && fingerPos < BEGIN + 2 * WIDTH && fingerPos > BEGIN + 1 * WIDTH) {
 				second = 1;
 			}
-			else if (second == 1 && lastIndex_z < 10.0 && curIndex_z > 10.0) {
+			else if (second == 1 && lastIndex_z < THRESHOLD && curIndex_z > THRESHOLD) {
 				second = 0;
 				_second = 1;
 				std::cout << "second" << std::endl;
 			}
-			if (third == 0 && lastIndex_z > 10.0 && curIndex_z < 10.0 && fingerPos < 400.0 && fingerPos > 350.0) {
+			if (third == 0 && lastIndex_z > THRESHOLD && curIndex_z < THRESHOLD && fingerPos < BEGIN + 3 * WIDTH && fingerPos > BEGIN + 2 * WIDTH) {
 				third = 1;
 			}
-			else if (third == 1 && lastIndex_z < 10.0 && curIndex_z > 10.0) {
+			else if (third == 1 && lastIndex_z < THRESHOLD && curIndex_z > THRESHOLD) {
 				third = 0;
 				_third = 1;
 				std::cout << "third" << std::endl;
 			}
-			if (fourth == 0 && lastIndex_z > 10.0 && curIndex_z < 10.0 && fingerPos < 450.0 && fingerPos > 400.0) {
+			if (fourth == 0 && lastIndex_z > THRESHOLD && curIndex_z < THRESHOLD && fingerPos < BEGIN + 4 * WIDTH && fingerPos > BEGIN + 3 * WIDTH) {
 				fourth = 1;
 			}
-			else if (fourth == 1 && lastIndex_z < 10.0 && curIndex_z > 10.0) {
+			else if (fourth == 1 && lastIndex_z < THRESHOLD && curIndex_z > THRESHOLD) {
 				fourth = 0;
 				_fourth = 1;
 				std::cout << "fourth" << std::endl;
@@ -394,48 +544,82 @@ public:
 			lastIndex_y = curIndex_y;
 			lastIndex_z = curIndex_z;
 		}
+		if (offsetFlag == 1) {
+			timeStamps.push_back(getSystemTime());
+			if (_first || _second || _third || _fourth) {
+				visual.push_back(1);
+			}
+			else {
+				visual.push_back(0);
+			}
+		}
 
-		// 游戏逻辑
-
-		if (_first == 1 && rects.front() == 0) {
-			_first = 0;
-			rects.pop();
-			int last = rects.back();
-			int temp = rand() % 4;
-			while (temp == last) {
-				temp = rand() % 4;
+#endif	
+		if (offsetFlag == 1) {
+			if (_first == 1) {
+				if (rects.front() == 0) {
+					blackCnt++;
+					_first = 0;
+					rects.pop();
+					int last = rects.back();
+					int temp = rand() % 4;
+					while (temp == last) {
+						temp = rand() % 4;
+					}
+					rects.push(temp);
+				}
+				else {
+					firstCnt = 3;
+				}
 			}
-			rects.push(temp);
-		}
-		else if (second == 1 && rects.front() == 1) {
-			_second = 0;
-			rects.pop();
-			int last = rects.back();
-			int temp = rand() % 4;
-			while (temp == last) {
-				temp = rand() % 4;
+			else if (_second == 1) {
+				if (rects.front() == 1) {
+					blackCnt++;
+					_second = 0;
+					rects.pop();
+					int last = rects.back();
+					int temp = rand() % 4;
+					while (temp == last) {
+						temp = rand() % 4;
+					}
+					rects.push(temp);
+				}
+				else {
+					secondCnt = 3;
+				}
 			}
-			rects.push(temp);
-		}
-		else if (third == 1 && rects.front() == 2) {
-			_third = 0;
-			rects.pop();
-			int last = rects.back();
-			int temp = rand() % 4;
-			while (temp == last) {
-				temp = rand() % 4;
+			else if (_third == 1) {
+				if (rects.front() == 2) {
+					blackCnt++;
+					_third = 0;
+					rects.pop();
+					int last = rects.back();
+					int temp = rand() % 4;
+					while (temp == last) {
+						temp = rand() % 4;
+					}
+					rects.push(temp);
+				}
+				else {
+					thirdCnt = 3;
+				}
 			}
-			rects.push(temp);
-		}
-		else if (fourth == 1 && rects.front() == 3) {
-			_fourth = 0;
-			rects.pop();
-			int last = rects.back();
-			int temp = rand() % 4;
-			while (temp == last) {
-				temp = rand() % 4;
+			else if (_fourth == 1) {
+				if (rects.front() == 3) {
+					blackCnt++;
+					_fourth = 0;
+					rects.pop();
+					int last = rects.back();
+					int temp = rand() % 4;
+					while (temp == last) {
+						temp = rand() % 4;
+					}
+					rects.push(temp);
+				}
+				else {
+					fourthCnt = 3;
+				}
 			}
-			rects.push(temp);
 		}
 
 		// std::cout << _rvec << std::endl;
@@ -482,22 +666,22 @@ public:
 
 		imshow("out", dst);
 
-		char key = (char)waitKey(1);
-		if (key == 's') {
-			// start
+		if (blackCnt == 60) {
 			return 1;
 		}
-		else if (key == 'n') {
-			// next
-			return 2;
-		}
-		else if (key == 'r') {
-			// redo
-			return 3;
-		}
-		else if (key == 'q') {
+
+		char key = (char)waitKey(1);
+		if (key == 'q') {
 			// quit
 			return 4;
+		}
+		else if (key == 's') {
+			offsetFlag = 1;
+			return 4;
+		}
+		else if (key == 'c') {
+			offset = curIndex_z;
+			std::cout << "Offset: " << offset << std::endl;
 		}
 		else {
 			return -1;
